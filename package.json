@@ -1,0 +1,16 @@
+{
+  "name": "h2s-dosimeter-system-root",
+  "version": "1.0.0",
+  "description": "Root workspace orchestrator for H2S Dosimeter System",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix mobile-app && npm install --prefix dashboard",
+    "seed": "npm run seed --prefix backend",
+    "dev:backend": "npm start --prefix backend",
+    "dev:mobile": "npm run dev --prefix mobile-app",
+    "dev:dashboard": "npm run dev --prefix dashboard",
+    "build:all": "npm run build --prefix mobile-app && npm run build --prefix dashboard"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.9.0"
+  }
+}

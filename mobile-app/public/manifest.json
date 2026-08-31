@@ -1,0 +1,25 @@
+{
+  "short_name": "H2S Dosimeter",
+  "name": "H₂S Dosimeter — Field Exposure Capture",
+  "description": "Passive chemical dosimeter scanner & end-of-shift exposure logger for oil & gas worker safety.",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0b0f19",
+  "theme_color": "#0b0f19",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/"
+}

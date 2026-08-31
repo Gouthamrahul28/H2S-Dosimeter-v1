@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7-jammy
+    container_name: h2s-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - h2s-network
+
+  # Backend API & Calibration Engine (Port 5000)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: h2s-backend
+    restart: unless-stopped
+    environment:
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/h2s-dosimeter
+      - CALIBRATION_CURVE_VERSION=placeholder-v1
+      - THRESHOLD_PPM_HOURS=80
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - mongodb
+    networks:
+      - h2s-network
+
+  # Mobile Field Capture PWA (Port 5173)
+  mobile-app:
+    build:
+      context: ./mobile-app
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:5000/api/v1
+    container_name: h2s-mobile-app
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - h2s-network
+
+  # Supervisor Safety Dashboard (Port 5174)
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:5000/api/v1
+    container_name: h2s-dashboard
+    restart: unless-stopped
+    ports:
+      - "5174:5174"
+    depends_on:
+      - backend
+    networks:
+      - h2s-network
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  h2s-network:
+    driver: bridge
