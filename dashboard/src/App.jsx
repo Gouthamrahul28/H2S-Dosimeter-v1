@@ -284,7 +284,7 @@ export default function App() {
               </span>
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-              Backend: <code>localhost:5000</code><br />
+              Backend: <code>{import.meta.env.VITE_API_BASE_URL ? new URL(import.meta.env.VITE_API_BASE_URL, window.location.origin).host : (typeof window !== 'undefined' ? `${window.location.hostname}:5000` : 'localhost:5000')}</code><br />
               Standard: <strong>ACGIH / OSHA / DGMS</strong>
             </div>
           </div>

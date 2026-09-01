@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: h2s-dosimeter-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: CALIBRATION_CURVE_VERSION
+        value: cupan-cielab-v1
+      - key: THRESHOLD_PPM_HOURS
+        value: 80
+      - key: MONGODB_URI
+        sync: false
