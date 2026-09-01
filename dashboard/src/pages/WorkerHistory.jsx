@@ -10,10 +10,18 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  ChevronDown,
+  ChevronUp,
+  Cpu
 } from 'lucide-react';
 import ExposureChart from '../components/ExposureChart';
 import ThresholdBadge from '../components/ThresholdBadge';
+import LightCorrectionPanel from '../components/LightCorrectionPanel';
+import CalculationTraceCard from '../components/CalculationTraceCard';
+import CuPanReferenceScale from '../components/CuPanReferenceScale';
+import StripInfoCard from '../components/StripInfoCard';
 import { getWorkers, getWorkerReadings, getWorkerCumulativeDose } from '../services/api';
 
 function toRgbString(rgb) {
@@ -35,6 +43,7 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
   const [readings, setReadings] = useState([]);
   const [cumulativeInfo, setCumulativeInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedReadingIndex, setSelectedReadingIndex] = useState(0);
 
   // Load worker list
   useEffect(() => {
@@ -51,6 +60,7 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
       ]);
       setReadings(readingsData || []);
       setCumulativeInfo(cumulativeData || null);
+      setSelectedReadingIndex(0);
     } catch (err) {
       console.error('Error loading worker history:', err);
     } finally {
@@ -75,6 +85,8 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
   const isOver = cumulativeInfo?.overThreshold;
   const percent = Math.min(100, Math.round((totalDose / threshold) * 100));
 
+  const activeReading = readings[selectedReadingIndex] || null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Header & Worker Selector */}
@@ -92,7 +104,7 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
               Worker Exposure Dosimetry Log
             </h1>
             <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              Shift-by-shift photometric analysis & exposure accumulation
+              Shift-by-shift photometric analysis & exposure accumulation (Cu-PAN Chemistry)
             </span>
           </div>
         </div>
@@ -149,25 +161,22 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                 </span>
               </div>
             </div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Logged Shifts: <strong style={{ color: 'var(--text-primary)' }}>{readings.length}</strong>
-            </span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>
+                {readings.length} Shifts Monitored
+              </span>
+              <span className="badge" style={{ fontSize: '0.72rem', background: 'rgba(124, 58, 237, 0.15)', color: '#c084fc', border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+                Cu-PAN Strip
+              </span>
+            </div>
           </div>
 
           {/* Cumulative Dose Metric */}
-          <div style={{ background: 'var(--bg-table-header)', padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
-                Cumulative Total Dose
-              </span>
-              <ThresholdBadge
-                totalDosePpmHours={totalDose}
-                thresholdPpmHours={threshold}
-                overThreshold={isOver}
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+          <div style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: '20px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              Cumulative Shift Exposure
+            </span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '4px 0' }}>
               <span
                 style={{
                   fontSize: '2.2rem',
@@ -198,8 +207,37 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
         </div>
       </div>
 
+      {/* Reference Scale & Strip Info */}
+      <CuPanReferenceScale />
+      <StripInfoCard batchData={{ batchId: activeReading?.stripBatch || 'CUPAN-001' }} />
+
       {/* Interactive Trend Chart */}
       <ExposureChart readings={readings} threshold={threshold} />
+
+      {/* Selected Reading Deep-Dive Panel */}
+      {activeReading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Cpu size={16} color="var(--accent-cyan)" />
+            <h3 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
+              Inspecting Shift {activeReading.shiftId} ({new Date(activeReading.capturedAt || activeReading.createdAt).toLocaleDateString()})
+            </h3>
+          </div>
+          <LightCorrectionPanel
+            readingData={activeReading}
+            rawStripRGB={activeReading.stripColorRGB}
+            rawWhiteRGB={activeReading.referenceColorRGB}
+            correctionStatus="APPLIED"
+          />
+          <CalculationTraceCard
+            readingData={activeReading}
+            rawStripRGB={activeReading.stripColorRGB}
+            rawWhiteRGB={activeReading.referenceColorRGB}
+            tempC={activeReading.ambientTemp || 25.0}
+            rhPct={activeReading.ambientHumidity || 50.0}
+          />
+        </div>
+      )}
 
       {/* Detailed Reading History Table */}
       <div className="glass-card" style={{ padding: '20px' }}>
@@ -209,7 +247,7 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
               Reading-by-Reading Audit Trail
             </h3>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              Individual optical patch extractions, lighting normalization & shift doses
+              Click any shift row to inspect its exact Light Correction & Optical Calculation Trace
             </span>
           </div>
 
@@ -233,135 +271,147 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                 <th>Reference Patch</th>
                 <th>Raw Strip</th>
                 <th>Corrected RGB</th>
-                <th style={{ textAlign: 'center' }}>Expiry Status</th>
+                <th style={{ textAlign: 'center' }}>Calibration Status</th>
                 <th style={{ textAlign: 'right' }}>Shift Dose (ppm·h)</th>
+                <th style={{ textAlign: 'center' }}>Inspect</th>
               </tr>
             </thead>
             <tbody>
               {readings.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
                     No readings logged for this worker yet.
                   </td>
                 </tr>
               ) : (
-                readings.map((r, i) => (
-                  <tr key={r.readingId || i}>
-                    {/* Shift ID */}
-                    <td>
-                      <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
-                        {r.shiftId}
-                      </strong>
-                    </td>
+                readings.map((r, i) => {
+                  const isSelected = selectedReadingIndex === i;
+                  return (
+                    <tr
+                      key={r.readingId || i}
+                      onClick={() => setSelectedReadingIndex(i)}
+                      style={{
+                        cursor: 'pointer',
+                        background: isSelected ? 'rgba(6, 182, 212, 0.08)' : 'transparent'
+                      }}
+                    >
+                      {/* Shift ID */}
+                      <td>
+                        <strong style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--accent-cyan)' : 'var(--text-primary)' }}>
+                          {r.shiftId}
+                        </strong>
+                      </td>
 
-                    {/* Timestamp */}
-                    <td>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                        {new Date(r.capturedAt || r.createdAt).toLocaleDateString()}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        {new Date(r.capturedAt || r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </td>
+                      {/* Timestamp */}
+                      <td>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>
+                          {new Date(r.capturedAt || r.createdAt).toLocaleDateString()}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {new Date(r.capturedAt || r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </td>
 
-                    {/* Ambient Env */}
-                    <td>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>{r.ambientTemp || 25}°C</span>
-                        <span>&bull;</span>
-                        <span>{r.ambientHumidity || 50}% RH</span>
-                      </div>
-                    </td>
+                      {/* Ambient Env */}
+                      <td>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>{r.ambientTemp || 25}°C</span>
+                          <span>&bull;</span>
+                          <span>{r.ambientHumidity || 50}% RH</span>
+                        </div>
+                      </td>
 
-                    {/* Reference Patch */}
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            background: toRgbString(r.referenceColorRGB),
-                            border: '1px solid var(--border-subtle)'
-                          }}
-                        />
-                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                          {toHex(r.referenceColorRGB)}
-                        </span>
-                      </div>
-                    </td>
+                      {/* Reference Patch */}
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: toRgbString(r.referenceColorRGB),
+                              border: '1px solid var(--border-subtle)'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                            {toHex(r.referenceColorRGB)}
+                          </span>
+                        </div>
+                      </td>
 
-                    {/* Raw Strip */}
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            background: toRgbString(r.stripColorRGB),
-                            border: '1px solid var(--border-subtle)'
-                          }}
-                        />
-                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                          {toHex(r.stripColorRGB)}
-                        </span>
-                      </div>
-                    </td>
+                      {/* Raw Strip */}
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: toRgbString(r.stripColorRGB),
+                              border: '1px solid var(--border-subtle)'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                            {toHex(r.stripColorRGB)}
+                          </span>
+                        </div>
+                      </td>
 
-                    {/* Corrected RGB */}
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            background: toRgbString(r.correctedColorRGB),
-                            border: '1.5px solid var(--accent-cyan)',
-                            boxShadow: '0 0 6px rgba(6,182,212,0.4)'
-                          }}
-                        />
-                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: '700' }}>
-                          {toHex(r.correctedColorRGB)}
-                        </span>
-                      </div>
-                    </td>
+                      {/* Corrected RGB */}
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: toRgbString(r.correctedColorRGB),
+                              border: '1.5px solid var(--accent-cyan)',
+                              boxShadow: '0 0 6px rgba(6,182,212,0.4)'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: '700' }}>
+                            {toHex(r.correctedColorRGB)}
+                          </span>
+                        </div>
+                      </td>
 
-                    {/* Expiry Patch */}
-                    <td style={{ textAlign: 'center' }}>
-                      {r.expiryPatchStatus === 'valid' && (
+                      {/* Calibration Status */}
+                      <td style={{ textAlign: 'center' }}>
                         <span style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)', fontWeight: '600' }}>
-                          &bull; Valid
+                          ● Valid (Cu-PAN)
                         </span>
-                      )}
-                      {r.expiryPatchStatus === 'expired' && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-rose)', fontWeight: '600' }}>
-                          &bull; Expired
-                        </span>
-                      )}
-                      {r.expiryPatchStatus === 'unreadable' && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', fontWeight: '600' }}>
-                          &bull; Unreadable
-                        </span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Shift Dose */}
-                    <td style={{ textAlign: 'right' }}>
-                      <span
-                        style={{
-                          fontWeight: '800',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: '0.95rem',
-                          color: Number(r.estimatedDosePpmHours) > 35 ? 'var(--accent-rose)' : 'var(--text-primary)'
-                        }}
-                      >
-                        {Number(r.estimatedDosePpmHours || 0).toFixed(1)}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                      {/* Shift Dose */}
+                      <td style={{ textAlign: 'right' }}>
+                        <strong
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '0.9rem',
+                            color: (r.estimatedDosePpmHours || r.dose || 0) > 20 ? 'var(--accent-rose)' : 'var(--text-primary)'
+                          }}
+                        >
+                          {(r.estimatedDosePpmHours || r.dose || 0).toFixed(1)}
+                        </strong>
+                      </td>
+
+                      {/* Inspect Action */}
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedReadingIndex(i);
+                          }}
+                          className={isSelected ? 'btn-primary' : 'btn-secondary'}
+                          style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                        >
+                          <Eye size={12} /> {isSelected ? 'Viewing' : 'Inspect'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

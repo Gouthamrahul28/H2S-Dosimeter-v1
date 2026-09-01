@@ -22,9 +22,9 @@ export default function MobileOnboardingModal({ isOpen, onClose, isDarkMode, onT
 
   const SLIDES = [
     {
-      title: 'H₂S Dosimeter Guide',
-      subtitle: 'Passive Colorimetric Wristband (SIH26118 / MRPL)',
-      badge: 'Step 1 of 4 • Welcome'
+      title: 'Cu-PAN H₂S Dosimeter Guide',
+      subtitle: 'Passive Colorimetric Sensor Strip (SIH26118)',
+      badge: 'Step 1 of 4 • Chemical Principle'
     },
     {
       title: 'Camera Alignment Reticle',
@@ -32,9 +32,9 @@ export default function MobileOnboardingModal({ isOpen, onClose, isDarkMode, onT
       badge: 'Step 2 of 4 • Photo Capture'
     },
     {
-      title: '7-Stage Chemical Scale',
-      subtitle: 'From baseline clean matrix to emergency evacuation',
-      badge: 'Step 3 of 4 • Safety Alert Ladder'
+      title: 'Cu-PAN Color Progression',
+      subtitle: 'Purple/Violet → Yellow/Orange Chemical Transition',
+      badge: 'Step 3 of 4 • Optical Response'
     },
     {
       title: 'Operating Rules & Actions',
@@ -106,20 +106,20 @@ export default function MobileOnboardingModal({ isOpen, onClose, isDarkMode, onT
                 </div>
                 <div>
                   <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', display: 'block' }}>
-                    Zero-Battery Wearable Sensor
+                    Cu-PAN Colorimetric Sensing
                   </strong>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4, display: 'block' }}>
-                    Your wristband darkens permanently as it absorbs H₂S gas throughout your shift.
+                    Cu(II)-PAN complex reacts with gaseous H₂S to produce CuS and release H-PAN, transitioning visually from <strong>Purple/Violet to Yellow/Orange</strong>.
                   </span>
                 </div>
               </div>
 
               <div className="glass-panel" style={{ padding: '14px' }}>
                 <strong style={{ fontSize: '0.82rem', color: 'var(--accent-cyan)', display: 'block', marginBottom: '4px' }}>
-                  💡 Dynamic Lighting Protection
+                  💡 Multi-Patch Chromatic Normalization
                 </strong>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4, display: 'block' }}>
-                  The app uses the printed white reference patch to cancel out lighting tints from warm sodium refinery lamps and shadows!
+                  The app uses the printed White and Grey reference patches to cancel ambient illumination tints and normalize across varying smartphone camera sensors.
                 </span>
               </div>
             </div>
@@ -142,22 +142,22 @@ export default function MobileOnboardingModal({ isOpen, onClose, isDarkMode, onT
                   <div style={{ background: '#ffffff', border: '1px solid #38bdf8', padding: '6px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '800', color: '#0f172a' }}>
                     1. REF (WHITE)
                   </div>
-                  <div style={{ background: '#e2e8f0', border: '1px solid #cbd5e1', padding: '6px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '800', color: '#334155' }}>
-                    3. EXPIRY
+                  <div style={{ background: '#808080', border: '1px solid #cbd5e1', padding: '6px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '800', color: '#ffffff' }}>
+                    3. GREY REF
                   </div>
                 </div>
 
-                <div style={{ margin: '8px auto', width: '70%', background: '#847e6c', border: '2px solid #0284c7', borderRadius: '6px', padding: '10px', textAlign: 'center' }}>
+                <div style={{ margin: '8px auto', width: '70%', background: '#8B4C94', border: '2px solid #0284c7', borderRadius: '6px', padding: '10px', textAlign: 'center' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff' }}>
-                    2. ACTIVE H₂S STRIP
+                    2. ACTIVE Cu-PAN STRIP
                   </span>
                 </div>
               </div>
 
               <ol style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', paddingLeft: '16px', lineHeight: 1.5, margin: 0 }}>
-                <li>Hold camera 15–25 cm above wristband.</li>
-                <li>Align badge inside on-screen reticles.</li>
-                <li>Tap capture button to process exposure.</li>
+                <li>Hold camera 15–25 cm perpendicular to badge.</li>
+                <li>Ensure all 3 target zones are in focus.</li>
+                <li>Tap capture to estimate cumulative dose in ppm·h.</li>
               </ol>
             </div>
           )}
@@ -178,8 +178,8 @@ export default function MobileOnboardingModal({ isOpen, onClose, isDarkMode, onT
                   }}
                 >
                   <div style={{ width: '24px', height: '18px', borderRadius: '4px', background: ref.hex, border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
-                  <strong style={{ width: '55px', fontSize: '0.8rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
-                    {ref.ppm} ppm
+                  <strong style={{ width: '65px', fontSize: '0.78rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+                    {ref.ppm} ppm·h
                   </strong>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-primary)', flex: 1 }}>
                     {ref.standard}
@@ -199,82 +199,67 @@ export default function MobileOnboardingModal({ isOpen, onClose, isDarkMode, onT
                   padding: '14px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', marginBottom: '6px' }}>
-                  <AlertTriangle size={18} />
-                  <strong style={{ fontSize: '0.85rem' }}>Immediate Action Protocol</strong>
-                </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
-                  If your reading shows <strong style={{ color: '#ef4444' }}>ALERT, DANGER or SEVERE</strong>, notify your area safety officer immediately and verify ambient ventilation.
-                </p>
+                <strong style={{ fontSize: '0.85rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <AlertTriangle size={16} /> DGMS Statutory Limit: 80 ppm·h
+                </strong>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4, display: 'block' }}>
+                  Cumulative exposure exceeding 80 ppm·h requires immediate work cessation and medical evaluation under Indian DGMS regulations.
+                </span>
               </div>
 
-              {/* Theme switch in modal */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 'var(--radius-sm)' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Theme Preference:</span>
-                <button
-                  onClick={onToggleTheme}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-full)',
-                    padding: '4px 10px',
-                    color: 'var(--text-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {isDarkMode ? <Sun size={13} color="#eab308" /> : <Moon size={13} color="#6366f1" />}
-                  <span>{isDarkMode ? 'Light' : 'Dark'} Mode</span>
-                </button>
+              <div className="glass-panel" style={{ padding: '12px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                  Scan at shift start (0.0 ppm·h baseline), mid-shift checkpoint, and shift completion to record continuous regulatory compliance.
+                </span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '5px' }}>
-            {SLIDES.map((_, idx) => (
+        {/* Footer Navigation */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
+          <button
+            className="btn-secondary"
+            onClick={() => setStep(Math.max(0, step - 1))}
+            disabled={step === 0}
+            style={{ padding: '8px 14px', fontSize: '0.8rem', opacity: step === 0 ? 0.4 : 1 }}
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+
+          {/* Dots Indicator */}
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {SLIDES.map((_, i) => (
               <div
-                key={idx}
-                onClick={() => setStep(idx)}
+                key={i}
                 style={{
-                  width: idx === step ? '18px' : '6px',
+                  width: i === step ? '20px' : '6px',
                   height: '6px',
                   borderRadius: '3px',
-                  background: idx === step ? 'var(--accent-cyan)' : 'var(--border-subtle)',
-                  cursor: 'pointer'
+                  background: i === step ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                  transition: 'all 0.2s'
                 }}
               />
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {step > 0 && (
-              <button className="btn-secondary" onClick={() => setStep(step - 1)} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
-                <ChevronLeft size={14} /> Back
-              </button>
-            )}
-
+          {step < SLIDES.length - 1 ? (
             <button
               className="btn-primary"
-              onClick={() => (step < SLIDES.length - 1 ? setStep(step + 1) : onClose())}
-              style={{ padding: '6px 16px', fontSize: '0.8rem', minHeight: '36px', width: 'auto' }}
+              onClick={() => setStep(step + 1)}
+              style={{ padding: '8px 14px', fontSize: '0.8rem' }}
             >
-              {step < SLIDES.length - 1 ? (
-                <>
-                  Next <ChevronRight size={14} />
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={14} /> Done
-                </>
-              )}
+              Next <ChevronRight size={16} />
             </button>
-          </div>
+          ) : (
+            <button
+              className="btn-primary"
+              onClick={onClose}
+              style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+            >
+              Get Started <CheckCircle2 size={16} />
+            </button>
+          )}
         </div>
       </div>
     </div>

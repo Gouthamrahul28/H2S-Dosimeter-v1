@@ -1,20 +1,13 @@
 /**
  * seed-large-dataset.js
  * 
- * High-Volume Industrial Dataset Generator for H2S Dosimeter System (SIH26118)
+ * High-Volume Industrial Dataset Generator for Cu-PAN H2S Dosimeter System (SIH26118)
  * 
  * Generates configurable large-scale enterprise data:
  * - 50 to 500+ Industrial workers across 8 operational units
- * - Hundreds to thousands of multi-shift exposure readings spanning 30-90 days
- * - Varied exposure profiles: Safe (70%), Approaching Warning (20%), Over Statutory Limit (10%)
- * - Realistic physical color coordinates, lighting conditions, temperatures, and humidities
- * 
- * Usage:
- *   node seed-large-dataset.js [workerCount] [shiftsPerWorker]
- * 
- * Example:
- *   node seed-large-dataset.js 50 10    # 50 workers, 500 total exposure records
- *   node seed-large-dataset.js 100 20   # 100 workers, 2,000 exposure records
+ * - Hundreds to thousands of multi-shift Cu-PAN exposure readings spanning 30-90 days
+ * - Varied exposure profiles: Safe (70%), Approaching Warning (20%), Over DGMS Limit (10%)
+ * - Physical Cu-PAN colorimetry (Purple/Violet -> Yellow/Orange)
  */
 
 const path = require('path');
@@ -25,6 +18,7 @@ const Worker = require('./backend/src/models/Worker');
 const Reading = require('./backend/src/models/Reading');
 const { calculateDose, UNEXPOSED_BASELINE_RGB } = require('./backend/src/services/doseCalculator');
 const { normalizeLighting } = require('./backend/src/services/lightingCorrection');
+const standards = require('./shared/colorimetricStandards.cjs');
 
 const DEFAULT_WORKER_COUNT = 50;
 const DEFAULT_SHIFTS_PER_WORKER = 12;
@@ -58,34 +52,32 @@ const DEPARTMENTS = [
 ];
 
 const LIGHTING_PROFILES = [
-  { name: 'Daylight 5500K', ref: { r: 255, g: 250, b: 245 } },
-  { name: 'Warm Sodium 2700K', ref: { r: 255, g: 200, b: 145 } },
+  { name: 'Daylight 5500K', ref: { r: 250, g: 250, b: 245 } },
+  { name: 'Warm Sodium 2700K', ref: { r: 250, g: 200, b: 145 } },
   { name: 'Cool Fluorescent 6500K', ref: { r: 235, g: 245, b: 255 } },
-  { name: 'Industrial Metal Halide', ref: { r: 220, g: 255, b: 230 } },
-  { name: 'Offshore Rig Floodlight', ref: { r: 242, g: 238, b: 255 } },
+  { name: 'Industrial Metal Halide', ref: { r: 220, g: 250, b: 230 } },
+  { name: 'Offshore Rig Floodlight', ref: { r: 242, g: 238, b: 250 } },
   { name: 'Twilight Shadow', ref: { r: 205, g: 218, b: 242 } }
 ];
 
-function generateSimulatedPhysicalStrip(targetDosePpmHours) {
-  // Calibrated linear Euclidean model: distance = targetDose / 0.38
-  const distance = Math.max(0, targetDosePpmHours) / 0.38;
-  const channelDelta = distance / Math.sqrt(3);
+function generateSimulatedPhysicalCuPANStrip(targetDosePpmHours) {
+  const normDose = Math.max(0.0, Math.min(160.0, targetDosePpmHours));
+  const t = Math.min(1.0, normDose / 100.0);
 
-  // Ag2S darkening: green/red drop proportionally, blue channel absorbs strongly
-  const r = Math.round(UNEXPOSED_BASELINE_RGB.r - channelDelta * 0.95);
-  const g = Math.round(UNEXPOSED_BASELINE_RGB.g - channelDelta * 1.02);
-  const b = Math.round(UNEXPOSED_BASELINE_RGB.b - channelDelta * 1.03);
+  const r = Math.round(139 + t * (225 - 139));
+  const g = Math.round(76 + t * (155 - 76));
+  const b = Math.round(148 - t * (148 - 45));
 
   return {
-    r: Math.max(15, Math.min(245, r)),
-    g: Math.max(15, Math.min(245, g)),
-    b: Math.max(15, Math.min(245, b))
+    r: Math.max(0, Math.min(255, r)),
+    g: Math.max(0, Math.min(255, g)),
+    b: Math.max(0, Math.min(255, b))
   };
 }
 
 async function runSeeder() {
   console.log('========================================================================');
-  console.log('⚡ H2S DOSIMETER — LARGE-SCALE DATABASE SEEDING ENGINE');
+  console.log('⚡ Cu-PAN H2S DOSIMETER — LARGE-SCALE DATABASE SEEDING ENGINE');
   console.log('========================================================================');
   console.log(`🏭 Target Workers:       ${workerCountArg}`);
   console.log(`📋 Shifts per Worker:     ${shiftsPerWorkerArg}`);
@@ -135,17 +127,14 @@ async function runSeeder() {
   for (let wIdx = 0; wIdx < workerIds.length; wIdx++) {
     const { workerId, department } = workerIds[wIdx];
 
-    // Determine worker risk profile
-    // 70% safe routine, 20% high-risk zone, 10% severe exposure incident
     const riskSeed = (wIdx * 17 + 13) % 100;
     const shiftCount = Math.max(4, Math.floor(shiftsPerWorkerArg * (0.8 + ((wIdx % 5) * 0.1))));
 
-    // Target cumulative dose across all shifts for this worker
-    let targetCumulative = 10.0 + (Math.random() * 35.0); // Safe (< 45 ppm*h)
+    let targetCumulative = 10.0 + (Math.random() * 35.0);
     if (riskSeed > 85) {
-      targetCumulative = 82.0 + (Math.random() * 45.0); // Over Limit (> 80 ppm*h)
+      targetCumulative = 82.0 + (Math.random() * 45.0); // Over Limit (> 80 ppm·h)
     } else if (riskSeed > 68) {
-      targetCumulative = 61.0 + (Math.random() * 17.0); // Warning (61 - 78 ppm*h)
+      targetCumulative = 61.0 + (Math.random() * 17.0); // Warning (61 - 78 ppm·h)
     }
 
     const avgShiftDose = targetCumulative / shiftCount;
@@ -156,22 +145,18 @@ async function runSeeder() {
       const shiftLetter = shiftTypes[s % 3];
       const shiftId = `${shiftDate.toISOString().slice(0, 10)}-${shiftLetter}`;
 
-      // Calculate shift dose with realistic shift-to-shift variance
       const variance = 0.7 + (Math.random() * 0.6);
       const targetDose = Math.max(0.2, avgShiftDose * variance);
-      const ambientTemp = Math.round((24.0 + Math.random() * 18.0) * 10) / 10; // 24°C - 42°C
-      const ambientHumidity = Math.round(35 + Math.random() * 50); // 35% - 85%
+      const ambientTemp = Math.round((24.0 + Math.random() * 18.0) * 10) / 10;
+      const ambientHumidity = Math.round(35 + Math.random() * 50);
 
-      // Pick a random lighting condition
       const lightProfile = LIGHTING_PROFILES[(s + wIdx) % LIGHTING_PROFILES.length];
-      const refGainR = lightProfile.ref.r / 255.0;
-      const refGainG = lightProfile.ref.g / 255.0;
-      const refGainB = lightProfile.ref.b / 255.0;
+      const refGainR = lightProfile.ref.r / 250.0;
+      const refGainG = lightProfile.ref.g / 250.0;
+      const refGainB = lightProfile.ref.b / 250.0;
 
-      // True physical color under ideal reference white
-      const trueStripRGB = generateSimulatedPhysicalStrip(targetDose);
+      const trueStripRGB = generateSimulatedPhysicalCuPANStrip(targetDose);
 
-      // Raw camera capture with ambient lighting tint + slight sensor noise
       const rawStripRGB = {
         r: Math.max(10, Math.min(255, Math.round(trueStripRGB.r * refGainR + (Math.random() * 2 - 1)))),
         g: Math.max(10, Math.min(255, Math.round(trueStripRGB.g * refGainG + (Math.random() * 2 - 1)))),
@@ -184,27 +169,31 @@ async function runSeeder() {
         b: Math.max(10, Math.min(255, Math.round(lightProfile.ref.b + (Math.random() * 2 - 1))))
       };
 
-      // Run lighting normalization
       const correctedRGB = normalizeLighting(rawStripRGB, rawRefRGB);
+      const exposureAnalysis = standards.analyzeExposure(correctedRGB, ambientTemp, ambientHumidity);
 
-      // Calculate calibrated dose from corrected color
-      const estimatedDose = calculateDose(correctedRGB, ambientTemp, ambientHumidity, 'placeholder-v1');
-
-      // Expiry status: 97% valid, 3% expired badge alert
       const expiryPatchStatus = (s === shiftCount - 1 && riskSeed === 99) ? 'expired' : 'valid';
 
       readings.push({
         workerId,
         shiftId,
         imageUrl: `/uploads/sample-${workerId.toLowerCase()}-shift${s + 1}.jpg`,
+        chemistry: 'Cu-PAN',
+        stripBatch: 'CUPAN-BATCH-001',
+        cameraProfile: 'mobile_001',
         stripColorRGB: rawStripRGB,
         referenceColorRGB: rawRefRGB,
+        greyColorRGB: { r: 128, g: 128, b: 128 },
         correctedColorRGB: correctedRGB,
+        lab: exposureAnalysis.lab,
+        deltaE00: exposureAnalysis.deltaE00,
+        confidence: 0.94,
+        calibrationStatus: exposureAnalysis.inRange ? 'VALID' : 'OUTSIDE CALIBRATION RANGE',
         expiryPatchStatus,
         ambientTemp,
         ambientHumidity,
-        estimatedDosePpmHours: estimatedDose,
-        calibrationCurveVersion: 'placeholder-v1',
+        estimatedDosePpmHours: exposureAnalysis.estimatedDosePpmHours,
+        calibrationCurveVersion: 'cupan-cielab-v1',
         capturedAt: shiftDate,
         createdAt: shiftDate
       });
@@ -212,14 +201,14 @@ async function runSeeder() {
   }
 
   // Bulk insert in chunks of 500
-  console.log(`💾 Writing ${readings.length} exposure records to MongoDB...`);
+  console.log(`💾 Writing ${readings.length} Cu-PAN exposure records to MongoDB...`);
   const CHUNK_SIZE = 500;
   for (let i = 0; i < readings.length; i += CHUNK_SIZE) {
     const chunk = readings.slice(i, i + CHUNK_SIZE);
     await Reading.insertMany(chunk);
     process.stdout.write(`  ... inserted ${Math.min(i + CHUNK_SIZE, readings.length)} / ${readings.length} records\r`);
   }
-  console.log(`\n✅ Bulk insertion of ${readings.length} records complete!`);
+  console.log(`\n✅ Bulk insertion of ${readings.length} Cu-PAN records complete!`);
 
   // Compute fleet breakdown statistics
   console.log('\n========================================================================');
@@ -247,9 +236,6 @@ async function runSeeder() {
   console.log(`🟢 Safe Fleet (<60 ppm·h):           ${safeCount} workers (${((safeCount / workersList.length) * 100).toFixed(1)}%)`);
   console.log(`🟡 Warning Approaching Limit (60-80): ${warningCount} workers (${((warningCount / workersList.length) * 100).toFixed(1)}%)`);
   console.log(`🔴 Over DGMS/OISD Limit (>80 ppm·h): ${overLimitCount} workers (${((overLimitCount / workersList.length) * 100).toFixed(1)}%)`);
-  console.log('========================================================================');
-  console.log('\n🚀 Open the Supervisor Dashboard to explore the large dataset:');
-  console.log('   👉 http://localhost:5174');
   console.log('========================================================================\n');
 
   process.exit(0);

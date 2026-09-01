@@ -6,6 +6,9 @@
 const standards = require('./colorimetricStandards.js');
 
 module.exports = {
+  CHEMISTRY: standards.CHEMISTRY,
+  INDICATOR: standards.INDICATOR,
+  DOSE_UNIT: standards.DOSE_UNIT,
   RISK_ZONES: standards.RISK_ZONES,
   ALERT_LEVELS: standards.ALERT_LEVELS,
   COLOR_REFERENCE: standards.COLOR_REFERENCE,
@@ -15,12 +18,16 @@ module.exports = {
   DEFAULT_CCM: standards.DEFAULT_CCM,
   CALIBRATION_POINTS: standards.CALIBRATION_POINTS,
   VIRGIN_BASELINE_LAB: standards.VIRGIN_BASELINE_LAB,
+  WHITE_REFERENCE_LAB: standards.WHITE_REFERENCE_LAB,
   GREY_REFERENCE_LAB: standards.GREY_REFERENCE_LAB,
   srgbChannelToLinear: standards.srgbChannelToLinear,
   linearChannelToSrgb: standards.linearChannelToSrgb,
   applyCameraCCM: standards.applyCameraCCM,
   bradfordAdapt: standards.bradfordAdapt,
   xyzToLab: standards.xyzToLab,
+  labToXyz: standards.labToXyz,
+  labToRgb: standards.labToRgb,
+  labToHex: standards.labToHex,
   ciede2000: standards.ciede2000,
   computeArrheniusRateFactor: standards.computeArrheniusRateFactor,
   estimateDoseFromDeltaE: standards.estimateDoseFromDeltaE,

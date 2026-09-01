@@ -14,9 +14,46 @@ const ReadingSchema = new mongoose.Schema(
       trim: true,
       index: true
     },
+    scanId: {
+      type: String,
+      trim: true,
+      index: true
+    },
+    stripId: {
+      type: String,
+      ref: 'Strip',
+      trim: true,
+      index: true
+    },
+    cumulativeStripDosePpmH: {
+      type: Number,
+      default: 0.0
+    },
+    lifeRemainingPercent: {
+      type: Number,
+      default: 100.0
+    },
+    stripStatus: {
+      type: String,
+      default: 'GOOD'
+    },
     imageUrl: {
       type: String,
       required: [true, 'Image URL/path is required']
+    },
+    chemistry: {
+      type: String,
+      default: 'Cu-PAN',
+      required: true
+    },
+    stripBatch: {
+      type: String,
+      default: 'CUPAN-BATCH-001',
+      index: true
+    },
+    cameraProfile: {
+      type: String,
+      default: 'mobile_001'
     },
     stripColorRGB: {
       r: { type: Number, required: true },
@@ -28,10 +65,33 @@ const ReadingSchema = new mongoose.Schema(
       g: { type: Number, required: true },
       b: { type: Number, required: true }
     },
+    greyColorRGB: {
+      r: { type: Number, default: 128 },
+      g: { type: Number, default: 128 },
+      b: { type: Number, default: 128 }
+    },
     correctedColorRGB: {
       r: { type: Number, required: true },
       g: { type: Number, required: true },
       b: { type: Number, required: true }
+    },
+    lab: {
+      L: { type: Number, default: 42.50 },
+      a: { type: Number, default: 38.20 },
+      b: { type: Number, default: -28.40 }
+    },
+    deltaE00: {
+      type: Number,
+      default: 0.0
+    },
+    confidence: {
+      type: Number,
+      default: 0.94
+    },
+    calibrationStatus: {
+      type: String,
+      enum: ['VALID', 'OUTSIDE CALIBRATION RANGE', 'NOT_CALIBRATED'],
+      default: 'VALID'
     },
     expiryPatchStatus: {
       type: String,
@@ -53,7 +113,7 @@ const ReadingSchema = new mongoose.Schema(
     calibrationCurveVersion: {
       type: String,
       required: true,
-      default: 'placeholder-v1'
+      default: 'cupan-cielab-v1'
     },
     capturedAt: {
       type: Date,
@@ -69,6 +129,8 @@ const ReadingSchema = new mongoose.Schema(
     toJSON: {
       transform: function (doc, ret) {
         ret.readingId = ret._id ? ret._id.toString() : undefined;
+        ret.dose = ret.estimatedDosePpmHours;
+        ret.unit = 'ppm·h';
         delete ret._id;
         delete ret.__v;
         return ret;

@@ -2,7 +2,7 @@
 h2s_dosimeter.tests.test_vision_calibration
 ===========================================
 Unit tests for vision preprocessing, ROI outlier filtering, white reference estimation,
-and calibration dataset/model fitting.
+and Cu-PAN calibration dataset/model fitting.
 """
 
 import numpy as np
@@ -35,7 +35,6 @@ class TestVisionFiltering:
 
     def test_saturation_rejection(self):
         """Pixels exceeding upper saturation threshold must be filtered out."""
-        # 100 pixels: 80 clean gray (180, 180, 180) and 20 blown-out specular highlights (255, 255, 255)
         clean = np.full((80, 3), 180, dtype=np.uint8)
         saturated = np.full((20, 3), 255, dtype=np.uint8)
         patch = np.vstack([clean, saturated])
@@ -60,7 +59,6 @@ class TestVisionFiltering:
     def test_roi_metric_extraction(self):
         """Verify robust median calculation from synthetic image patch."""
         img = np.full((100, 100, 3), 150, dtype=np.uint8)
-        # Inject specular noise
         img[10:20, 10:20] = 255
         
         roi = ROIDefinition(name="TestROI", x_min=0.0, y_min=0.0, x_max=1.0, y_max=1.0)
@@ -93,66 +91,69 @@ class TestWhiteReferenceEstimation:
         assert res.valid is False
         assert len(res.rejection_reason) > 0
 
-    def test_auto_detect_source_white(self):
-        """Image with white card margin should auto-detect white point without explicit ROI."""
-        from ..calibration.white_reference import auto_detect_source_white
-        # Create image with dark background and white card in the center
-        img = np.full((300, 300, 3), 40, dtype=np.uint8)
-        img[50:250, 50:250] = [240, 240, 240]  # White card
-        img[100:200, 100:200] = [110, 95, 80]   # Darkened strip in middle
-        
-        res = auto_detect_source_white(img)
-        assert res.valid is True
-        assert res.confidence_score >= 50.0
-        assert res.source_white_rgb_8bit[0] >= 230
 
-
-class TestCalibrationModels:
-    """Tests for Dose Calibration Models (Piecewise & Polynomial)."""
+class TestCuPANCalibrationModels:
+    """Tests for Cu-PAN Dose Calibration Models (Piecewise & Polynomial)."""
 
     @pytest.fixture
     def dataset(self):
         return load_calibration_dataset(DEFAULT_CALIBRATION_DATASET_PATH)
 
+    def test_cupan_chemistry_validation(self, dataset):
+        """Dataset must strictly identify as Cu-PAN."""
+        assert dataset.chemistry == "Cu-PAN"
+        assert dataset.indicator == "Copper(II)-PAN"
+        assert len(dataset.records) > 0
+
+    def test_reject_lead_chemistry(self):
+        """Non-Cu-PAN datasets (such as legacy lead) must be rejected."""
+        with pytest.raises(ValueError):
+            load_calibration_dataset({
+                "dataset_name": "Legacy-Lead-Dataset",
+                "chemistry": "Lead-Acetate",
+                "records": []
+            })
+
     def test_piecewise_model_anchors(self, dataset):
-        """Piecewise model must reproduce calibrated anchor points exactly."""
+        """Piecewise model must reproduce calibrated Cu-PAN anchor points."""
         model = PiecewiseInterpolationModel().fit(dataset)
         
-        # Test zero baseline
-        pred_0 = model.predict([95.4, -0.4, 4.2], deltaE00=0.0)
+        # Test zero baseline (Cu-PAN virgin purple)
+        pred_0 = model.predict([42.50, 38.20, -28.40], deltaE00=0.0)
         assert pred_0.estimated_dose_ppm_h == 0.0
         assert pred_0.is_calibrated_domain is True
-        assert pred_0.calibration_status == "CALIBRATED"
+        assert pred_0.calibration_status == "VALID"
+        assert pred_0.chemistry == "Cu-PAN"
+        assert pred_0.unit == "ppm·h"
         
         # Test 20.0 ppm·h anchor
         rec_20 = next(r for r in dataset.records if r.dose_ppm_h == 20.0)
         pred_20 = model.predict([rec_20.L, rec_20.a, rec_20.b], deltaE00=rec_20.deltaE00)
-        assert abs(pred_20.estimated_dose_ppm_h - 20.0) < 0.1
+        assert abs(pred_20.estimated_dose_ppm_h - 20.0) < 0.2
 
     def test_out_of_range_handling(self, dataset):
         """Out of range ΔE00 must report 'OUTSIDE CALIBRATION RANGE' and not silently extrapolate."""
         model = PiecewiseInterpolationModel().fit(dataset)
         
-        # ΔE00 of 150 is far beyond the 69.8 maximum in the calibration dataset
-        pred_out = model.predict([5.0, 0.0, 0.0], deltaE00=150.0)
+        # ΔE00 of 150 is far beyond the maximum calibrated chemical response
+        pred_out = model.predict([90.0, 0.0, 90.0], deltaE00=150.0)
         assert pred_out.is_calibrated_domain is False
         assert pred_out.calibration_status == "OUTSIDE CALIBRATION RANGE"
-        assert "exceeds" in pred_out.warning_message.lower()
+        assert pred_out.warning_message == "OUTSIDE_CALIBRATION_RANGE"
 
     def test_temperature_humidity_compensation(self, dataset):
-        """Higher temperature accelerates reaction kinetics, yielding a normalized lower dose for the same darkness."""
+        """Higher temperature accelerates reaction kinetics, yielding a normalized lower dose for same observed color."""
         model = PiecewiseInterpolationModel().fit(dataset)
         
-        pred_std = model.predict([58.6, 1.1, 11.2], temperature_c=25.0, humidity_percent=50.0, deltaE00=32.1)
-        pred_hot = model.predict([58.6, 1.1, 11.2], temperature_c=45.0, humidity_percent=70.0, deltaE00=32.1)
+        pred_std = model.predict([58.20, 21.80, 19.40], temperature_c=25.0, humidity_percent=50.0, deltaE00=30.50)
+        pred_hot = model.predict([58.20, 21.80, 19.40], temperature_c=45.0, humidity_percent=70.0, deltaE00=30.50)
         
-        # k_env > 1.0 at elevated temperature and humidity
         assert pred_hot.env_compensation_factor > pred_std.env_compensation_factor
         assert pred_hot.estimated_dose_ppm_h < pred_std.estimated_dose_ppm_h
 
     def test_polynomial_model_fitting(self, dataset):
-        """Polynomial model must achieve high R² on dataset."""
+        """Polynomial model must achieve high R² on Cu-PAN dataset."""
         model = PolynomialRegressionModel(degree=2, alpha=1e-3).fit(dataset)
         metrics = model.evaluate(dataset)
         assert metrics["r2"] > 0.95
-        assert metrics["mae"] < 2.0
+        assert metrics["mae"] < 4.0

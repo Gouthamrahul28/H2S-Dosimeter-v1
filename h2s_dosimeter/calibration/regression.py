@@ -1,4 +1,4 @@
-"""Calibration Dose Regression and Piecewise Monotonic Interpolation Models.
+"""Cu-PAN Calibration Dose Regression and Piecewise Monotonic Interpolation Models.
 
 Translates optical chemical shift (ΔE_00, ΔL*, Δa*, Δb*) to cumulative H2S exposure dose (ppm·h).
 Enforces domain safety: flags out-of-range observations rather than blindly extrapolating.
@@ -17,9 +17,9 @@ class DoseCalibrationModel:
 
 
 class PiecewiseMonotonicDoseModel(DoseCalibrationModel):
-    """Piecewise monotonic PCHIP/Linear interpolation model.
+    """Piecewise monotonic linear/spline interpolation model.
 
-    Guarantees that increasing strip darkening (ΔE_00) strictly maps to non-decreasing dose.
+    Maps increasing Cu-PAN chemical transition (ΔE_00) strictly to non-decreasing cumulative dose.
     """
 
     def __init__(
@@ -27,7 +27,7 @@ class PiecewiseMonotonicDoseModel(DoseCalibrationModel):
         cal_delta_e00: np.ndarray,
         cal_dose_ppm_h: np.ndarray,
         min_valid_delta_e00: float = 0.0,
-        max_valid_delta_e00: float = 78.5
+        max_valid_delta_e00: float = 75.0
     ):
         sort_idx = np.argsort(cal_delta_e00)
         self.cal_delta = np.asarray(cal_delta_e00[sort_idx], dtype=np.float64)
@@ -43,8 +43,8 @@ class PiecewiseMonotonicDoseModel(DoseCalibrationModel):
         """
         val = float(delta_e00)
 
-        # Baseline check (<= 1.2 ΔE00 is unexposed virgin substrate)
-        if val <= 1.2:
+        # Baseline check (<= 1.0 ΔE00 is unexposed virgin Cu-PAN substrate)
+        if val <= 1.0:
             return 0.0, True, "Virgin Unexposed Baseline"
 
         # Out-of-range detection
@@ -68,7 +68,7 @@ class PolynomialDoseModel(DoseCalibrationModel):
         self,
         coefficients: np.ndarray,
         min_valid_delta_e00: float = 0.0,
-        max_valid_delta_e00: float = 78.5
+        max_valid_delta_e00: float = 75.0
     ):
         self.coeffs = np.asarray(coefficients, dtype=np.float64)
         self.min_valid_delta = float(min_valid_delta_e00)

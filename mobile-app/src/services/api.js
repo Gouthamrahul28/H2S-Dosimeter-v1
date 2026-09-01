@@ -1,13 +1,13 @@
 /**
  * mobile-app/src/services/api.js
  * 
- * Production REST API client targeting the H₂S Dosimeter Backend.
+ * Production REST API client targeting the Cu-PAN H₂S Dosimeter Backend.
  * Features:
  * - Dynamic LAN IP and relative proxy resolution
  * - 30-second AbortController timeout guard
  * - Granular network & HTTP status classification
  * - Active request/response telemetry logging
- * - Health check & test upload diagnostic endpoints
+ * - Health check & Cu-PAN calibration endpoints
  */
 
 const STORAGE_API_OVERRIDE_KEY = 'h2s_custom_api_base_url';
@@ -99,26 +99,16 @@ async function request(endpoint, options = {}) {
 
     console.log(`[API Response] ${method} ${url} -> Status ${response.status} (${latencyMs} ms)`, {
       status: response.status,
-      latency: `${latencyMs} ms`,
       data
     });
 
     if (!response.ok) {
-      // Categorize HTTP errors
-      let classifiedMessage = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
-      if (response.status === 413) {
-        classifiedMessage = 'PAYLOAD_TOO_LARGE: Photo is too large for the server. Please downscale the image.';
-      } else if (response.status === 415) {
-        classifiedMessage = 'UNSUPPORTED_FORMAT: Server could not process this image format. Use standard JPG/PNG.';
-      } else if (response.status === 422 || response.status === 400) {
-        classifiedMessage = `INVALID_PAYLOAD: ${data.error || 'Missing or invalid parameters'}`;
-      } else if (response.status >= 500) {
-        classifiedMessage = `SERVER_PROCESSING_ERROR: ${data.error || 'Server encountered an internal error during image analysis.'}`;
-      }
-      const error = new Error(classifiedMessage);
-      error.status = response.status;
-      error.data = data;
-      throw error;
+      const errorMsg = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+      const err = new Error(errorMsg);
+      err.status = response.status;
+      err.code = response.status === 404 ? 'NOT_FOUND' : (response.status >= 500 ? 'SERVER_ERROR' : 'CLIENT_ERROR');
+      err.data = data;
+      throw err;
     }
 
     return data;
@@ -127,32 +117,28 @@ async function request(endpoint, options = {}) {
     const latencyMs = Math.round(performance.now() - startTime);
 
     if (err.name === 'AbortError') {
-      console.error(`[API Timeout] ${method} ${url} timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
-      const timeoutErr = new Error('TIMEOUT: The processing server did not respond within 30 seconds. Please retry.');
+      const timeoutErr = new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Backend is taking too long to respond.`);
       timeoutErr.code = 'TIMEOUT';
+      timeoutErr.status = 408;
       throw timeoutErr;
     }
 
-    if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('Load failed'))) {
-      console.error(`[API Network Error] ${method} ${url} unreachable (${latencyMs} ms):`, err.message);
-      const networkErr = new Error(
-        `NETWORK_ERROR: Cannot reach the H₂S processing server at ${baseUrl}. Ensure your phone and laptop are connected to the same Wi-Fi network.`
-      );
-      networkErr.code = 'NETWORK_ERROR';
-      throw networkErr;
+    if (!err.status) {
+      const netErr = new Error(`Network connection failed (${err.message || 'Server unreachable'}). Check if backend is running on ${baseUrl}`);
+      netErr.code = 'NETWORK_ERROR';
+      netErr.status = 0;
+      throw netErr;
     }
 
-    console.error(`[API Error] ${method} ${url} failed (${latencyMs} ms):`, err.message);
     throw err;
   }
 }
 
 /**
- * Health Check API: Tests GET /health on the target backend
+ * Health Check API: Tests GET /health or GET /api/v1/health on target backend
  */
 export async function checkBackendHealth() {
   const baseUrl = getApiBaseUrl();
-  // Derive root health endpoint URL from base URL
   let healthUrl;
   try {
     if (baseUrl.startsWith('http')) {
@@ -183,6 +169,7 @@ export async function checkBackendHealth() {
       return {
         isConnected: true,
         status: 'CONNECTED',
+        chemistry: json.chemistry || 'Cu-PAN',
         latencyMs,
         service: json.service || 'h2s-dosimeter-backend',
         url: healthUrl,
@@ -229,7 +216,7 @@ export async function testImageUpload(imageBase64) {
   return request(testUploadUrl, {
     method: 'POST',
     body: JSON.stringify({
-      filename: 'mobile_pic_test.jpg',
+      filename: 'cupan_pic_test.jpg',
       imageBase64
     })
   });
@@ -261,24 +248,36 @@ export async function getWorkerCumulativeDose(workerId) {
 }
 
 /**
- * Submit wristband capture reading
+ * Submit Cu-PAN wristband capture reading to POST /api/v1/scan (or /readings)
  */
 export async function submitReading(payload) {
-  console.log("SCAN API:", `${getApiBaseUrl()}/readings`, "Payload worker:", payload.workerId);
+  const fullPayload = {
+    chemistry: 'Cu-PAN',
+    stripBatch: 'CUPAN-BATCH-001',
+    cameraProfile: 'mobile_001',
+    ...payload
+  };
+
+  console.log("SCAN API:", `${getApiBaseUrl()}/scan`, "Payload worker:", fullPayload.workerId);
   try {
-    return await request('/readings', {
+    return await request('/scan', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(fullPayload)
     });
   } catch (err) {
     if (err.code === 'NETWORK_ERROR' || !navigator.onLine) {
       console.warn('[Offline Mode] Network unavailable. Enqueuing reading locally.');
-      enqueueOfflineReading(payload);
+      enqueueOfflineReading(fullPayload);
       return {
         _isOfflineQueued: true,
-        workerId: payload.workerId,
-        shiftId: payload.shiftId,
+        chemistry: 'Cu-PAN',
+        unit: 'ppm·h',
+        workerId: fullPayload.workerId,
+        shiftId: fullPayload.shiftId,
         estimatedDosePpmHours: 0.0,
+        dose: 0.0,
+        confidence: 0.94,
+        calibrationStatus: 'VALID',
         qualityStatus: 'QUEUED_OFFLINE',
         qualityScore: 90,
         alertLevel: 'SAFE',
@@ -290,6 +289,47 @@ export async function submitReading(payload) {
     }
     throw err;
   }
+}
+
+/**
+ * Fetch Cu-PAN calibration profile
+ */
+export async function getCuPANCalibration() {
+  return request('/calibration/cupan');
+}
+
+/**
+ * Get active Cu-PAN strip for worker
+ */
+export async function getActiveStrip(workerId) {
+  return request(`/workers/${encodeURIComponent(workerId)}/active-strip`);
+}
+
+/**
+ * Activate a new Cu-PAN strip
+ */
+export async function activateStrip(payload) {
+  return request('/strip/activate', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+/**
+ * Replace an active or expired Cu-PAN strip
+ */
+export async function replaceStrip(payload) {
+  return request('/strip/replace', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+/**
+ * Get all available batches
+ */
+export async function getBatches() {
+  return request('/strip/batches');
 }
 
 /**
@@ -318,7 +358,7 @@ export async function syncOfflineReadings() {
 
     for (const item of queue) {
       try {
-        await request('/readings', {
+        await request('/scan', {
           method: 'POST',
           body: JSON.stringify(item)
         });

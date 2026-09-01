@@ -14,16 +14,19 @@ import {
   HelpCircle,
   Sparkles,
   Layers,
-  Scale
+  Scale,
+  FlaskConical
 } from 'lucide-react';
 import Overview from './pages/Overview';
 import WorkerHistory from './pages/WorkerHistory';
 import DGMSReport from './pages/DGMSReport';
 import StandardsPage from './pages/StandardsPage';
+import BatchesPage from './pages/BatchesPage';
+import CalibrationModelPage from './pages/CalibrationModelPage';
 import OnboardingModal from './components/OnboardingModal';
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('overview'); // 'overview' | 'history' | 'dgms' | 'standards'
+  const [currentPage, setCurrentPage] = useState('overview'); // 'overview' | 'history' | 'calibration' | 'batches' | 'dgms' | 'standards'
   const [selectedWorkerId, setSelectedWorkerId] = useState('W1001');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('h2s_dashboard_theme');
@@ -148,6 +151,50 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setCurrentPage('calibration')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: currentPage === 'calibration' ? '1px solid var(--border-active)' : '1px solid transparent',
+              background: currentPage === 'calibration' ? 'rgba(6, 182, 212, 0.12)' : 'transparent',
+              color: currentPage === 'calibration' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              textAlign: 'left'
+            }}
+          >
+            <FlaskConical size={18} />
+            <span>Calibration & Model</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentPage('batches')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: currentPage === 'batches' ? '1px solid var(--border-active)' : '1px solid transparent',
+              background: currentPage === 'batches' ? 'rgba(6, 182, 212, 0.12)' : 'transparent',
+              color: currentPage === 'batches' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              textAlign: 'left'
+            }}
+          >
+            <Layers size={18} />
+            <span>Cu-PAN Batches</span>
+          </button>
+
+          <button
             onClick={() => setCurrentPage('dgms')}
             style={{
               display: 'flex',
@@ -255,6 +302,14 @@ export default function App() {
             initialWorkerId={selectedWorkerId}
             onBack={() => setCurrentPage('overview')}
           />
+        )}
+
+        {currentPage === 'calibration' && (
+          <CalibrationModelPage />
+        )}
+
+        {currentPage === 'batches' && (
+          <BatchesPage />
         )}
 
         {currentPage === 'dgms' && (

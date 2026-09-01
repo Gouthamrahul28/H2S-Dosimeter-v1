@@ -1,6 +1,6 @@
-"""H2S Chemical Strip Colorimetric Metric Analyzer.
+"""Cu-PAN Chemical Strip Colorimetric Metric Analyzer.
 
-Quantifies the chemical color transition of the sensing strip relative to
+Quantifies the chemical color transition of the Cu-PAN sensing strip relative to
 the virgin unexposed substrate baseline:
     ΔL* = L* - L0*
     Δa* = a* - a0*
@@ -12,9 +12,11 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 from ..colorimetry.delta_e import ciede2000
 
+CUPAN_DEFAULT_BASELINE_LAB = (42.50, 38.20, -28.40)
+
 
 class StripOpticalMetrics:
-    """Encapsulates optical colorimetric measurements of the H2S strip."""
+    """Encapsulates optical colorimetric measurements of the Cu-PAN strip."""
 
     def __init__(
         self,
@@ -25,7 +27,7 @@ class StripOpticalMetrics:
         delta_a: float,
         delta_b: float,
         color_variance: float,
-        is_darkened: bool
+        is_reacted: bool = False
     ):
         self.lab = np.asarray(lab, dtype=np.float64)
         self.baseline_lab = np.asarray(baseline_lab, dtype=np.float64)
@@ -34,7 +36,8 @@ class StripOpticalMetrics:
         self.delta_a = round(float(delta_a), 2)
         self.delta_b = round(float(delta_b), 2)
         self.color_variance = round(float(color_variance), 2)
-        self.is_darkened = is_darkened
+        self.is_reacted = is_reacted
+        self.is_darkened = is_reacted  # Backwards compatibility attribute
 
     @property
     def L(self) -> float:
@@ -61,20 +64,20 @@ class StripOpticalMetrics:
             "delta_b": self.delta_b,
             "delta_e00": self.delta_e00,
             "color_variance": self.color_variance,
-            "is_darkened": self.is_darkened
+            "is_reacted": self.is_reacted
         }
 
 
 def analyze_strip_color(
     current_lab: np.ndarray,
-    baseline_lab: Union[np.ndarray, list, tuple] = (95.40, -0.42, 4.18),
+    baseline_lab: Union[np.ndarray, list, tuple] = CUPAN_DEFAULT_BASELINE_LAB,
     color_variance: float = 0.0
 ) -> StripOpticalMetrics:
-    """Analyzes the optical color transition of the active H2S chemical strip.
+    """Analyzes the optical color transition of the active Cu-PAN chemical strip.
 
     Args:
         current_lab: Measured CIELAB vector [L*, a*, b*] of the exposed strip.
-        baseline_lab: Virgin unexposed strip baseline [L0*, a0*, b0*].
+        baseline_lab: Virgin unexposed strip baseline [L0*, a0*, b0*] (default: Cu-PAN purple).
         color_variance: Spatial variance of the strip pixels.
 
     Returns:
@@ -88,7 +91,7 @@ def analyze_strip_color(
     delta_b = float(lab[2] - base[2])
 
     delta_e00 = ciede2000(base, lab)
-    is_darkened = delta_L < -1.5 or delta_e00 > 2.0
+    is_reacted = delta_e00 > 1.5
 
     return StripOpticalMetrics(
         lab=lab,
@@ -98,7 +101,7 @@ def analyze_strip_color(
         delta_a=delta_a,
         delta_b=delta_b,
         color_variance=color_variance,
-        is_darkened=is_darkened
+        is_reacted=is_reacted
     )
 
 

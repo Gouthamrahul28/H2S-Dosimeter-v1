@@ -7,6 +7,7 @@ const connectDB = require('./config/db');
 const readingRoutes = require('./routes/readingRoutes');
 const workerRoutes = require('./routes/workerRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const calibrationRoutes = require('./routes/calibrationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,13 +16,6 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Middleware
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174'
-];
-
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -61,7 +55,7 @@ app.get('/', (req, res) => {
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>H₂S Dosimeter System — API Gateway</title>
+        <title>Cu-PAN H₂S Dosimeter System — API Gateway</title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 40px 20px; display: flex; justify-content: center; }
           .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; max-width: 600px; width: 100%; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
@@ -79,14 +73,14 @@ app.get('/', (req, res) => {
       </head>
       <body>
         <div class="card">
-          <span class="badge">● ONLINE — SYSTEM OPERATIONAL</span>
-          <h1>H₂S Dosimeter Backend API</h1>
-          <p>Optical exposure reading, chromatic normalization, and DGMS/OISD regulatory reporting services are active.</p>
+          <span class="badge">● ONLINE — Cu-PAN SYSTEM OPERATIONAL</span>
+          <h1>Cu-PAN H₂S Dosimeter Backend API</h1>
+          <p>Optical Cu-PAN exposure reading, chromatic normalization, and DGMS/OISD regulatory reporting services are active.</p>
           <div class="links">
             <a class="btn btn-primary" href="http://localhost:5174" target="_blank">Open Safety Supervisor Dashboard (Port 5174) &rarr;</a>
             <a class="btn btn-secondary" href="http://localhost:5173" target="_blank">Open Mobile Field Capture App (Port 5173) &rarr;</a>
             <a class="btn btn-secondary" href="/health">View Health Check (<code>/health</code>)</a>
-            <a class="btn btn-secondary" href="/api/v1/workers">View Workers API (<code>/api/v1/workers</code>)</a>
+            <a class="btn btn-secondary" href="/api/v1/calibration/cupan">View Cu-PAN Calibration (<code>/api/v1/calibration/cupan</code>)</a>
           </div>
         </div>
       </body>
@@ -95,34 +89,42 @@ app.get('/', (req, res) => {
   }
   res.json({
     status: 'ok',
-    system: 'H2S Dosimeter System API',
-    version: '1.0.0',
+    system: 'Cu-PAN H2S Dosimeter System API',
+    chemistry: 'Cu-PAN',
+    indicator: 'Copper(II)-PAN',
+    unit: 'ppm·h',
+    version: '2.0.0',
     endpoints: {
       health: '/health',
+      healthApi: '/api/v1/health',
+      scan: '/api/v1/scan',
       workers: '/api/v1/workers',
       readings: '/api/v1/readings',
       reports: '/api/v1/reports',
-      calibrationCurves: '/api/v1/calibration/curves'
-    },
-    webApps: {
-      fieldApp: 'http://localhost:5173',
-      supervisorDashboard: 'http://localhost:5174'
+      calibrationCuPAN: '/api/v1/calibration/cupan',
+      calibrationCamera: '/api/v1/calibration/camera'
     }
   });
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoints
+const handleHealth = (req, res) => {
   res.json({
     status: 'ok',
     service: 'h2s-dosimeter-backend',
+    chemistry: 'Cu-PAN',
+    indicator: 'Copper(II)-PAN',
+    unit: 'ppm·h',
     time: new Date().toISOString()
   });
-});
+};
+
+app.get('/health', handleHealth);
+app.get('/api/v1/health', handleHealth);
 
 // Minimal Image Test Upload Endpoint (multipart or JSON base64)
 const handleTestUpload = (req, res) => {
-  const { imageBase64, filename = 'photo.jpg' } = req.body || {};
+  const { imageBase64, filename = 'cupan_photo.jpg' } = req.body || {};
   let sizeBytes = 0;
   let contentType = 'image/jpeg';
 
@@ -140,6 +142,7 @@ const handleTestUpload = (req, res) => {
   return res.json({
     status: 'received',
     filename,
+    chemistry: 'Cu-PAN',
     size_bytes: sizeBytes,
     content_type: contentType,
     timestamp: new Date().toISOString()
@@ -149,14 +152,18 @@ const handleTestUpload = (req, res) => {
 app.post('/test-upload', handleTestUpload);
 app.post('/api/v1/test-upload', handleTestUpload);
 
+const stripRoutes = require('./routes/stripRoutes');
+
 // API Routes (Contract Base: /api/v1)
 app.use('/api/v1/readings', readingRoutes);
 app.use('/api/v1/workers', workerRoutes);
+app.use('/api/v1/strip', stripRoutes);
+app.use('/api/v1/admin', stripRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/calibration', calibrationRoutes);
 app.use('/scan', readingRoutes);
 app.use('/api/v1/scan', readingRoutes);
 app.get('/api/v1/calibration/curves', require('./controllers/reportController').getCalibrationCurves);
-
 
 // 404 Handler
 app.use((req, res) => {
@@ -176,8 +183,9 @@ app.use((err, req, res, next) => {
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`=================================================`);
-    console.log(`  H2S Dosimeter Backend API running on port ${PORT}`);
+    console.log(`  Cu-PAN H2S Dosimeter Backend API running on port ${PORT}`);
     console.log(`  Listening on: 0.0.0.0:${PORT} (All Network Interfaces)`);
+    console.log(`  Chemistry: Cu-PAN (Copper(II)-PAN)`);
     console.log(`  Base URL: http://localhost:${PORT}/api/v1`);
     console.log(`  Health Check: http://localhost:${PORT}/health`);
     console.log(`=================================================`);

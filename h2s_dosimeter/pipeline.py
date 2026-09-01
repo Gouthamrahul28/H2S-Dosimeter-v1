@@ -1,4 +1,4 @@
-"""Master Colorimetric Processing Pipeline Orchestrator.
+"""Master Colorimetric Processing Pipeline Orchestrator for Cu-PAN H₂S Dosimeter.
 
 Conforms strictly to:
 - CIE 015:2018 Colorimetry
@@ -6,35 +6,35 @@ Conforms strictly to:
 - ISO/TR 17321-2:2012 Scene Analysis Transforms
 - ISO/CIE 11664-6:2022 CIEDE2000 Color Difference
 
-Architecture:
-  Raw Frame
-      │
-      ▼
-  Image Quality Gate (Saturation, Glare, Blur, Uniformity)
-      │
-      ▼
-  3-Patch ROI Extraction [White | Grey | Active Strip]
-      │
-      ▼
+Cu-PAN Architecture:
+  H2S Exposure -> Cu-PAN Strip (Purple/Violet -> Yellow/Orange)
+       │
+       ▼
+  Image Quality Gate (Focus, Saturation, Underexposure, Glare, Uniformity)
+       │
+       ▼
+  3-Patch ROI Extraction [White | Grey | Active Cu-PAN Strip]
+       │
+       ▼
   Linear sRGB Gamma Inversion
-      │
-      ▼
+       │
+       ▼
   Camera Characterization Matrix (CCM): XYZ = CCM @ RGB_linear
-      │
-      ▼
+       │
+       ▼
   Optional Bradford Chromatic Adaptation (only if W_src ≠ W_ref)
-      │
-      ▼
+       │
+       ▼
   CIE 1976 CIELAB (L*, a*, b*)
-      │
-      ▼
+       │
+       ▼
   ISO/CIE 11664-6:2022 CIEDE2000 (ΔE00)
-      │
-      ▼
-  Experimental Calibration Dose Model + Arrhenius (T, RH)
-      │
-      ▼
-  Statutory Risk Evaluation & Multi-Factor Confidence Scoring
+       │
+       ▼
+  Cu-PAN Experimental Calibration Dose Model + Arrhenius (T, RH)
+       │
+       ▼
+  Cumulative Dose (ppm·h) & Statutory Risk Evaluation
 """
 
 from dataclasses import dataclass, asdict
@@ -57,7 +57,7 @@ from .dosimetry.confidence import compute_confidence_score
 
 
 class DosimeterAnalysisResult:
-    """Encapsulates the complete dosimeter measurement and diagnostic trace."""
+    """Encapsulates the complete Cu-PAN dosimeter measurement and diagnostic trace."""
 
     def __init__(
         self,
@@ -78,6 +78,7 @@ class DosimeterAnalysisResult:
         rate_factor: float,
         is_in_range: bool,
         status_message: str,
+        chemistry: str = "Cu-PAN",
         is_demo_data: bool = False
     ):
         self.success = success
@@ -97,11 +98,13 @@ class DosimeterAnalysisResult:
         self.rate_factor = round(float(rate_factor), 3)
         self.is_in_range = is_in_range
         self.status_message = status_message
+        self.chemistry = chemistry
+        self.unit = "ppm·h"
         self.is_demo_data = is_demo_data
 
     @property
     def status_label(self) -> str:
-        return "CALIBRATED" if self.is_in_range else "UNCALIBRATED"
+        return "VALID" if self.is_in_range else "OUTSIDE_CALIBRATION_RANGE"
 
     @property
     def dose_ppm_hours(self) -> float:
@@ -145,14 +148,19 @@ class DosimeterAnalysisResult:
     def to_dict(self) -> dict:
         """Serializes result into clean summary + expandable diagnostic details."""
         return {
-            # 1. Clean Summary (1-second glance for dashboard & operators)
+            # 1. Clean Summary (1-second glance for dashboard & mobile UI)
             "summary": {
+                "chemistry": self.chemistry,
                 "estimated_dose_ppm_h": self.estimated_dose_ppm_h,
+                "dose": self.estimated_dose_ppm_h,
+                "unit": self.unit,
+                "calibration_status": self.status_label,
                 "status": self.risk_zone.name,
                 "status_color": self.risk_zone.color_hex,
                 "badge_class": self.risk_zone.badge_class,
                 "action_required": self.risk_zone.action,
                 "confidence_percent": self.confidence_percent,
+                "confidence": round(self.confidence_percent / 100.0, 2),
                 "temperature_c": self.temperature_c,
                 "humidity_percent": self.humidity_percent,
                 "quality_status": "GOOD" if self.quality_gate.passed else "POOR — RECAPTURE REQUIRED",
@@ -166,11 +174,13 @@ class DosimeterAnalysisResult:
                 "action_required": self.risk_zone.action,
                 "is_over_limit": self.estimated_dose_ppm_h > 80.0
             },
-            # 2. Complete Scientific Diagnostic Trace (for judges & technical audit)
+            # 2. Complete Scientific Diagnostic Trace (for audit & researcher inspect)
             "diagnostics": {
                 "success": self.success,
+                "chemistry": self.chemistry,
                 "status_message": self.status_message,
                 "is_in_calibration_range": self.is_in_range,
+                "calibration_status": self.status_label,
                 "camera_profile": {
                     "camera_id": self.camera_id,
                     "is_characterized": self.is_camera_characterized
@@ -189,7 +199,7 @@ class DosimeterAnalysisResult:
 
 
 class H2SDosimeterEngine:
-    """Master dosimeter analysis engine."""
+    """Master Cu-PAN dosimeter analysis engine."""
 
     def __init__(
         self,
@@ -213,7 +223,7 @@ class H2SDosimeterEngine:
         force_pass_quality: bool = False,
         is_demo_data: bool = False
     ) -> DosimeterAnalysisResult:
-        """Executes the full scientific colorimetry and dosimetry pipeline.
+        """Executes the full scientific colorimetry and dosimetry pipeline for Cu-PAN strips.
 
         Args:
             frame: uint8 RGB numpy image or CameraCaptureFrame object.
@@ -277,6 +287,7 @@ class H2SDosimeterEngine:
                 rate_factor=1.0,
                 is_in_range=False,
                 status_message=f"Capture Rejected: {'; '.join(quality_gate.reasons)}",
+                chemistry="Cu-PAN",
                 is_demo_data=is_demo
             )
 
@@ -303,7 +314,7 @@ class H2SDosimeterEngine:
         # 8. Convert to CIE 1976 CIELAB (L*, a*, b*)
         lab = xyz_to_lab(adapted_xyz, white_point=cam_profile.white_point)
 
-        # 9. Compute Optical Shift Metrics (ISO/CIE 11664-6:2022 CIEDE2000)
+        # 9. Compute Optical Shift Metrics (ISO/CIE 11664-6:2022 CIEDE2000 from Cu-PAN baseline)
         strip_metrics = analyze_strip_color(
             current_lab=lab,
             baseline_lab=self.strip_dataset.baseline_lab,
@@ -350,6 +361,7 @@ class H2SDosimeterEngine:
             rate_factor=k_env,
             is_in_range=is_in_range,
             status_message=status_msg,
+            chemistry="Cu-PAN",
             is_demo_data=is_demo
         )
 
@@ -379,7 +391,7 @@ class H2SDosimeterEngine:
         shift_hours: float = 8.0,
         camera_id: Optional[str] = None
     ) -> DosimeterAnalysisResult:
-        """Processes direct raw RGB inputs for strip and white standard."""
+        """Processes direct raw RGB inputs for Cu-PAN strip and white standard."""
         raw_strip = np.array(strip_rgb_8bit, dtype=np.float64)
         raw_white = np.array(white_rgb_8bit if white_rgb_8bit is not None else [245, 245, 245], dtype=np.float64)
 
@@ -429,5 +441,6 @@ class H2SDosimeterEngine:
             humidity_percent=humidity_percent,
             rate_factor=k_env,
             is_in_range=is_in_range,
-            status_message=status_msg
+            status_message=status_msg,
+            chemistry="Cu-PAN"
         )

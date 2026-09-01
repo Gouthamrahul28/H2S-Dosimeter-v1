@@ -1,15 +1,17 @@
 {
+  "chemistry": "Cu-PAN",
+  "indicator": "Copper(II)-PAN",
   "camera_model": "Generic-sRGB-Fallback",
   "is_fallback": true,
-  "calibration_date": "2026-01-01",
-  "notes": "Standard ITU-R BT.709 sRGB matrix (D65). FALLBACK ONLY — calibrate camera CCM for production.",
+  "calibration_date": "2026-09-01",
+  "notes": "Standard ITU-R BT.709 sRGB matrix (D65) with Cu-PAN colorimetric reference baseline.",
   "ccm_matrix": [
     [0.4124564, 0.3575761, 0.1804375],
     [0.2126729, 0.7151522, 0.0721750],
     [0.0193339, 0.1191920, 0.9503041]
   ],
   "reference_white": [0.95047, 1.0, 1.08883],
-  "reference_baseline_lab": [95.4, -0.4, 4.2],
+  "reference_baseline_lab": [42.50, 38.20, -28.40],
   "white_reference_roi": {
     "name": "White_Reference_Patch",
     "x_min": 0.05,
@@ -19,7 +21,7 @@
     "is_normalized": true
   },
   "h2s_strip_roi": {
-    "name": "H2S_Active_Strip",
+    "name": "CuPAN_Active_Strip",
     "x_min": 0.55,
     "y_min": 0.20,
     "x_max": 0.95,

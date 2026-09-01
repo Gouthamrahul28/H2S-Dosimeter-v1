@@ -11,7 +11,8 @@ import {
   ThermometerSun,
   Activity,
   Layers,
-  Sparkles
+  Sparkles,
+  FlaskConical
 } from 'lucide-react';
 import {
   COLOR_REFERENCE,
@@ -26,10 +27,13 @@ import {
   rgbToHex,
   hexToRgb
 } from '@shared/colorimetricStandards';
+import CuPanReferenceScale from '../components/CuPanReferenceScale';
+import StripInfoCard from '../components/StripInfoCard';
+import LightCorrectionPanel from '../components/LightCorrectionPanel';
 
 export default function StandardsPage() {
   // Swatch Tester State
-  const [selectedHex, setSelectedHex] = useState('#847E6C');
+  const [selectedHex, setSelectedHex] = useState('#8B4C94'); // Cu-PAN Virgin baseline
   const [ambientTemp, setAmbientTemp] = useState(25.0);
   const [ambientHumidity, setAmbientHumidity] = useState(50.0);
 
@@ -70,15 +74,20 @@ export default function StandardsPage() {
       <div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '700', color: 'var(--accent-cyan)', background: 'rgba(6, 182, 212, 0.1)', padding: '4px 10px', borderRadius: 'var(--radius-full)', marginBottom: '8px' }}>
           <ShieldAlert size={14} />
-          <span>STATUTORY OCCUPATIONAL HEALTH STANDARDS</span>
+          <span>Cu-PAN COLORIMETRIC DOSIMETER (SIH26118)</span>
         </div>
         <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
-          Regulatory Colorimetrics & 8-Hour Shift TWA
+          Cu-PAN Optical Standards & 8-Hour Shift Dosimetry
         </h1>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          Grounded in ACGIH (1 ppm TWA / 5 ppm STEL), NIOSH (10 ppm ceiling / 100 ppm IDLH), OSHA Table Z-2 (20 ppm PEL), and DGMS / OISD-STD-114.
+          Sensing Principle: Cu(II)-PAN complex + H₂S → CuS + H-PAN (Purple/Violet → Yellow/Orange). Grounded in ACGIH (1 ppm TWA / 5 ppm STEL), NIOSH (10 ppm ceiling), and DGMS (80 ppm·h shift limit).
         </p>
       </div>
+
+      {/* Cu-PAN Reference Scale & Strip Batch Tracking */}
+      <CuPanReferenceScale />
+      <StripInfoCard batchData={{ batchId: 'CUPAN-001' }} />
+      <LightCorrectionPanel correctionStatus="APPLIED" />
 
       {/* Grid: Interactive Swatch Tester + TWA Calculator */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px' }}>
@@ -86,7 +95,7 @@ export default function StandardsPage() {
         <div className="glass-card" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={18} color="var(--accent-cyan)" /> Reference Color Anchors (Grey ➔ Black)
+              <Sparkles size={18} color="var(--accent-cyan)" /> Cu-PAN Anchors (Purple/Violet ➔ Yellow/Orange)
             </h3>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click any swatch to test</span>
           </div>
@@ -122,9 +131,9 @@ export default function StandardsPage() {
                       flexShrink: 0
                     }}
                   />
-                  <div style={{ width: '80px' }}>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
-                      {ref.ppm} ppm
+                  <div style={{ width: '85px' }}>
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+                      {ref.ppm} ppm·h
                     </strong>
                   </div>
                   <div style={{ flex: 1 }}>
@@ -157,7 +166,7 @@ export default function StandardsPage() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
-                SELECTED COLOR EVALUATION:
+                Cu-PAN SPECTRAL RESPONSE ESTIMATION:
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
@@ -188,14 +197,14 @@ export default function StandardsPage() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
                   <span style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                    {exposureResult.estimatedPPM} ppm
+                    {exposureResult.estimatedDosePpmHours} ppm·h
                   </span>
                   <span className={`badge badge-${exposureResult.badgeClass}`}>
                     {exposureResult.alertLevel}
                   </span>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  {exposureResult.note}
+                  Optical Shift ΔE₀₀: <strong>{exposureResult.deltaE00}</strong> | Status: <strong>{exposureResult.calibrationStatus}</strong>
                 </p>
               </div>
             </div>
@@ -366,19 +375,12 @@ export default function StandardsPage() {
             </div>
 
             <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
-              {shiftAnalysis.shiftTWA_ppm.toFixed(2)} ppm
+              {shiftAnalysis.twa.toFixed(2)} ppm (Total Dose: {shiftAnalysis.totalDosePpmHours} ppm·h)
             </div>
 
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
               {shiftAnalysis.note}
             </p>
-
-            {shiftAnalysis.dataQualityWarning && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '6px 8px', borderRadius: '6px' }}>
-                <AlertTriangle size={13} />
-                <span>{shiftAnalysis.dataQualityWarning}</span>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -445,7 +447,7 @@ export default function StandardsPage() {
               </tr>
               <tr>
                 <td><strong>DGMS / OISD-STD-114 (India)</strong></td>
-                <td><strong style={{ color: '#06b6d4' }}>80.0 ppm·hours</strong></td>
+                <td><strong style={{ color: '#06b6d4' }}>80.0 ppm·h</strong></td>
                 <td>Statutory Cumulative Shift Dose</td>
                 <td>Automated regulatory audit flag & supervisor register</td>
                 <td>OISD-STD-114 / DGMS Mine Safety</td>

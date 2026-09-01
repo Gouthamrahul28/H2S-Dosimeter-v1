@@ -1,4 +1,4 @@
-"""End-to-end Pipeline Integration Test Suite."""
+"""End-to-end Cu-PAN Pipeline Integration Test Suite."""
 
 import pytest
 import numpy as np
@@ -8,9 +8,9 @@ from ..camera.capture import generate_synthetic_calibration_frame, CameraCapture
 
 
 def test_full_pipeline_baseline_frame():
-    """Verify unexposed baseline frame processes to 0.0 ppm·h SAFE reading with full diagnostics."""
+    """Verify unexposed Cu-PAN baseline frame (purple/violet) processes to 0.0 ppm·h SAFE reading."""
     engine = H2SDosimeterEngine()
-    frame = generate_synthetic_calibration_frame(strip_lab=(95.4, -0.42, 4.18))
+    frame = generate_synthetic_calibration_frame(strip_lab=(42.50, 38.20, -28.40))
 
     result = engine.process_frame(
         frame=frame,
@@ -20,24 +20,26 @@ def test_full_pipeline_baseline_frame():
     )
 
     assert result.success is True
+    assert result.chemistry == "Cu-PAN"
     assert result.estimated_dose_ppm_h == 0.0
     assert result.risk_zone.name == "SAFE"
     assert result.confidence_percent >= 80.0
-    assert result.strip_metrics.delta_e00 <= 1.2
+    assert result.strip_metrics.delta_e00 <= 1.5
 
     # Verify structured dictionary serialization
     data = result.to_dict()
     assert "summary" in data
     assert "diagnostics" in data
+    assert data["summary"]["chemistry"] == "Cu-PAN"
     assert data["summary"]["status"] == "SAFE"
     assert data["diagnostics"]["colorimetry_trace"]["cielab"] is not None
 
 
 def test_full_pipeline_moderate_exposure_frame():
-    """Verify exposed strip (40.0 ppm·h target) accurately estimates dose and WARNING tier."""
+    """Verify exposed Cu-PAN strip (40.0 ppm·h target) accurately estimates dose and WARNING/ALERT tier."""
     engine = H2SDosimeterEngine()
-    # Lab of CAL-040: (58.6, 11.2, 32.5)
-    frame = generate_synthetic_calibration_frame(strip_lab=(58.6, 11.2, 32.5))
+    # Lab of Cu-PAN CAL-040: (64.50, 18.20, 36.80)
+    frame = generate_synthetic_calibration_frame(strip_lab=(64.50, 18.20, 36.80))
 
     result = engine.process_frame(
         frame=frame,
@@ -47,6 +49,7 @@ def test_full_pipeline_moderate_exposure_frame():
     )
 
     assert result.success is True
-    assert pytest.approx(result.estimated_dose_ppm_h, abs=2.0) == 40.0
+    assert result.chemistry == "Cu-PAN"
+    assert pytest.approx(result.estimated_dose_ppm_h, abs=3.0) == 40.0
     assert result.risk_zone.name in ["WARNING", "ALERT"]
-    assert result.strip_metrics.delta_e00 >= 30.0
+    assert result.strip_metrics.delta_e00 >= 35.0

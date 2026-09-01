@@ -1,11 +1,12 @@
-"""Experimental H2S Chemical Strip Calibration Dataset and Arrhenius Compensation.
+"""Experimental Cu-PAN Chemical Strip Calibration Dataset and Arrhenius Compensation.
 
 Manages:
-1. Loading calibrated chamber data points.
+1. Loading calibrated chamber data points for Cu-PAN (copper(II) complex of 1-(2-pyridylazo)-2-naphthol).
 2. Arrhenius temperature and relative humidity kinetic rate adjustment:
        k(T, RH) = exp[ -Ea/R * (1/T - 1/T_ref) ] * (RH / RH_ref)^alpha
        ΔE_00_normalized = ΔE_00_measured / k(T, RH)
 3. Initializing and validating dose models against empirical chamber points.
+4. Rejecting invalid or non-Cu-PAN chemistry profiles.
 """
 
 import json
@@ -18,19 +19,24 @@ DEFAULT_STRIP_CONFIG = Path(__file__).resolve().parent.parent / "config" / "stri
 
 
 class StripCalibrationDataset:
-    """Encapsulates the experimental chamber calibration dataset."""
+    """Encapsulates the experimental chamber calibration dataset for Cu-PAN strips."""
 
     def __init__(self, config_path: Optional[Union[str, Path]] = None):
         self.config_path = Path(config_path) if config_path else DEFAULT_STRIP_CONFIG
-        self.version = "experimental-chem-v2.0"
-        self.strip_type = "Lead-Acetate Impregnated Cellulose"
-        self.baseline_lab = np.array([95.40, -0.42, 4.18], dtype=np.float64)
+        self.version = "cupan-chem-v1.0"
+        self.chemistry = "Cu-PAN"
+        self.indicator = "Copper(II)-PAN"
+        self.substrate = "Regenerated Cellulose / Paper Matrix"
+        self.initial_color = "PURPLE_VIOLET"
+        self.final_color = "YELLOW_ORANGE"
+        self.baseline_lab = np.array([42.50, 38.20, -28.40], dtype=np.float64)
+        self.white_lab = np.array([95.40, -0.42, 1.18], dtype=np.float64)
         self.grey_lab = np.array([52.60, 0.15, -0.25], dtype=np.float64)
         self.domain = {
             "min_dose_ppm_h": 0.0,
             "max_dose_ppm_h": 160.0,
             "min_delta_e00": 0.0,
-            "max_delta_e00": 78.5,
+            "max_delta_e00": 75.0,
             "min_temp_c": 10.0,
             "max_temp_c": 50.0,
             "min_rh_percent": 15.0,
@@ -60,11 +66,21 @@ class StripCalibrationDataset:
             return
         with open(self.config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+            chem = data.get("chemistry", "")
+            if chem and chem != "Cu-PAN":
+                raise ValueError(f"Unsupported strip chemistry: '{chem}'. Only 'Cu-PAN' is supported.")
+            self.chemistry = chem or self.chemistry
             self.version = data.get("version", self.version)
-            self.strip_type = data.get("strip_type", self.strip_type)
+            self.indicator = data.get("indicator", self.indicator)
+            self.substrate = data.get("substrate", self.substrate)
+            self.initial_color = data.get("initial_color", self.initial_color)
+            self.final_color = data.get("final_color", self.final_color)
             if "virgin_baseline_lab" in data:
                 b = data["virgin_baseline_lab"]
                 self.baseline_lab = np.array([b["L"], b["a"], b["b"]], dtype=np.float64)
+            if "white_reference_lab" in data:
+                w = data["white_reference_lab"]
+                self.white_lab = np.array([w["L"], w["a"], w["b"]], dtype=np.float64)
             if "grey_reference_lab" in data:
                 g = data["grey_reference_lab"]
                 self.grey_lab = np.array([g["L"], g["a"], g["b"]], dtype=np.float64)

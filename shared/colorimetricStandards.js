@@ -1,12 +1,17 @@
 /**
  * shared/colorimetricStandards.js
  * 
- * Master Colorimetric and Exposure Dosimetry Module conforming to:
+ * Master Colorimetric and Exposure Dosimetry Module for Cu-PAN H₂S Dosimeter
+ * Conforming to:
  * - CIE 015:2018 Colorimetry
  * - ISO 17321-1:2012 Digital Still Camera Characterization
  * - ISO/CIE 11664-6:2022 CIEDE2000
  * - Indian DGMS 80 ppm·h shift exposure limit
  */
+
+export const CHEMISTRY = 'Cu-PAN';
+export const INDICATOR = 'Copper(II)-PAN';
+export const DOSE_UNIT = 'ppm·h';
 
 // Statutory Risk Zones (DGMS / ACGIH / NIOSH / OSHA)
 export const RISK_ZONES = [
@@ -21,13 +26,14 @@ export const RISK_ZONES = [
 export const ALERT_LEVELS = RISK_ZONES;
 export const D65_WHITE = { x: 0.95047, y: 1.00000, z: 1.08883 };
 
-// Visual color progression aid (Notice: Visual reference aid only; actual dose is computed from CIEDE2000)
+// Visual color progression aid for Cu-PAN (Purple/Violet -> Yellow/Orange)
+// Notice: Visual reference aid only; actual dose is computed from CIEDE2000 against calibrated anchors
 export const COLOR_REFERENCE = [
-  { ppm: 0.0,   hex: '#F5F2E8', label: 'Unexposed / baseline', standard: 'Clean Matrix Baseline (0 ppm·h)' },
-  { ppm: 2.0,   hex: '#D8D4C8', label: 'Low shift exposure', standard: 'Within 1 ppm TWA' },
-  { ppm: 10.0,  hex: '#847E6C', label: 'Caution threshold reached', standard: 'ACGIH TWA threshold (10 ppm·h)' },
-  { ppm: 40.0,  hex: '#5C5545', label: 'Warning tier reached', standard: 'ACGIH STEL / 50% DGMS shift limit' },
-  { ppm: 80.0,  hex: '#332C22', label: 'Critical danger reached', standard: 'DGMS 80 ppm·h shift limit' }
+  { ppm: 0.0,   hex: '#8B4C94', label: 'Unexposed / baseline', standard: 'Cu-PAN Virgin Baseline (0.0 ppm·h - Purple/Violet)' },
+  { ppm: 2.0,   hex: '#8F58A5', label: 'Low shift exposure', standard: 'Early Shift (2.0 ppm·h - Violet Family)' },
+  { ppm: 10.0,  hex: '#A87382', label: 'Caution threshold reached', standard: 'ACGIH TWA (10.0 ppm·h - Purple/Orange Transition)' },
+  { ppm: 40.0,  hex: '#CC8E4E', label: 'Warning tier reached', standard: 'ACGIH STEL (40.0 ppm·h - Mixed Amber/Orange)' },
+  { ppm: 80.0,  hex: '#DE9930', label: 'Critical limit reached', standard: 'DGMS Shift Limit (80.0 ppm·h - Yellow/Orange)' }
 ];
 
 export const VALID_TEMP_RANGE_C = { min: 10, max: 50 };
@@ -40,22 +46,23 @@ export const DEFAULT_CCM = [
   [0.0193339, 0.1191920, 0.9503041]
 ];
 
-// Experimental Chamber Calibration Points (25°C, 50% RH)
+// Experimental Cu-PAN Chamber Calibration Points (25°C, 50% RH)
 export const CALIBRATION_POINTS = [
-  { dose: 0.0,   deltaE00: 0.00,  L: 95.40, a: -0.42, b: 4.18 },
-  { dose: 2.0,   deltaE00: 4.25,  L: 91.80, a: 0.85,  b: 9.40 },
-  { dose: 5.0,   deltaE00: 9.80,  L: 87.20, a: 2.65,  b: 15.80 },
-  { dose: 10.0,  deltaE00: 16.90, L: 80.50, a: 5.10,  b: 23.40 },
-  { dose: 20.0,  deltaE00: 23.10, L: 71.30, a: 8.40,  b: 29.80 },
-  { dose: 40.0,  deltaE00: 31.70, L: 58.60, a: 11.20, b: 32.50 },
-  { dose: 60.0,  deltaE00: 40.50, L: 48.20, a: 12.80, b: 30.10 },
-  { dose: 80.0,  deltaE00: 47.30, L: 40.10, a: 13.10, b: 26.20 },
-  { dose: 120.0, deltaE00: 55.80, L: 30.80, a: 12.40, b: 19.80 },
-  { dose: 160.0, deltaE00: 62.40, L: 24.50, a: 10.90, b: 14.50 }
+  { dose: 0.0,   deltaE00: 0.00,  L: 42.50, a: 38.20, b: -28.40 },
+  { dose: 2.0,   deltaE00: 4.85,  L: 44.10, a: 35.40, b: -21.80 },
+  { dose: 5.0,   deltaE00: 11.20, L: 47.30, a: 31.20, b: -11.50 },
+  { dose: 10.0,  deltaE00: 19.60, L: 52.00, a: 26.50, b: 2.80 },
+  { dose: 20.0,  deltaE00: 30.50, L: 58.20, a: 21.80, b: 19.40 },
+  { dose: 40.0,  deltaE00: 44.20, L: 64.50, a: 18.20, b: 36.80 },
+  { dose: 60.0,  deltaE00: 53.80, L: 68.00, a: 16.40, b: 48.50 },
+  { dose: 80.0,  deltaE00: 61.10, L: 70.50, a: 15.20, b: 56.20 },
+  { dose: 120.0, deltaE00: 67.40, L: 72.00, a: 14.80, b: 60.50 },
+  { dose: 160.0, deltaE00: 70.50, L: 72.80, a: 14.50, b: 62.00 }
 ];
 
-export const VIRGIN_BASELINE_LAB = { L: 95.40, a: -0.42, b: 4.18 };
-export const GREY_REFERENCE_LAB = { L: 52.60, a: 0.15, b: -0.25 };
+export const VIRGIN_BASELINE_LAB = { L: 42.50, a: 38.20, b: -28.40 };
+export const WHITE_REFERENCE_LAB = { L: 95.40, a: -0.42, b: 1.18 };
+export const GREY_REFERENCE_LAB  = { L: 52.60, a: 0.15,  b: -0.25 };
 
 // --- 1. sRGB Linearization (CIE 015 / IEC 61966-2-1) ---
 export function srgbChannelToLinear(c) {
@@ -148,6 +155,41 @@ export function xyzToLab(x, y, z, whitePoint = D65_WHITE) {
   };
 }
 
+export function labToXyz(L, a, b, whitePoint = D65_WHITE) {
+  const fy = (L + 16.0) / 116.0;
+  const fx = a / 500.0 + fy;
+  const fz = fy - b / 200.0;
+
+  const xr = fx > DELTA ? Math.pow(fx, 3) : (fx - F_OFFSET) / F_FACTOR;
+  const yr = fy > DELTA ? Math.pow(fy, 3) : (fy - F_OFFSET) / F_FACTOR;
+  const zr = fz > DELTA ? Math.pow(fz, 3) : (fz - F_OFFSET) / F_FACTOR;
+
+  return {
+    x: xr * whitePoint.x,
+    y: yr * whitePoint.y,
+    z: zr * whitePoint.z
+  };
+}
+
+export function labToRgb(L, a, b, whitePoint = D65_WHITE) {
+  const xyz = labToXyz(L, a, b, whitePoint);
+  // Inverse sRGB matrix (D65)
+  const rLin =  3.2404542 * xyz.x - 1.5371385 * xyz.y - 0.4985314 * xyz.z;
+  const gLin = -0.9692660 * xyz.x + 1.8760108 * xyz.y + 0.0415560 * xyz.z;
+  const bLin =  0.0556434 * xyz.x - 0.2040259 * xyz.y + 1.0572252 * xyz.z;
+
+  return {
+    r: linearChannelToSrgb(rLin),
+    g: linearChannelToSrgb(gLin),
+    b: linearChannelToSrgb(bLin)
+  };
+}
+
+export function labToHex(L, a, b, whitePoint = D65_WHITE) {
+  const rgb = labToRgb(L, a, b, whitePoint);
+  return rgbToHex(rgb);
+}
+
 // --- 5. ISO/CIE 11664-6:2022 CIEDE2000 ---
 export function ciede2000(lab1, lab2) {
   const L1 = lab1.L, a1 = lab1.a, b1 = lab1.b;
@@ -234,7 +276,7 @@ export function computeArrheniusRateFactor(tempC, rhPct) {
 
   if (tempC < 10.0 || tempC > 50.0) {
     envValid = false;
-    envReason = `Temperature (${tempC}°C) exceeds manufacturer rating (10–50°C)`;
+    envReason = `Temperature (${tempC}°C) exceeds rated range (10–50°C)`;
   }
   if (rhPct < 15.0 || rhPct > 90.0) {
     envValid = false;
@@ -254,8 +296,8 @@ export function estimateDoseFromDeltaE(deltaE00, tempC = 25.0, rhPct = 50.0) {
   const { rateFactor, envValid, envReason } = computeArrheniusRateFactor(tempC, rhPct);
   const normDelta = deltaE00 / rateFactor;
 
-  if (normDelta <= 1.2) {
-    return { dosePpmHours: 0.0, inRange: true, status: 'Virgin Baseline' };
+  if (normDelta <= 1.0) {
+    return { dosePpmHours: 0.0, inRange: true, status: 'VALID' };
   }
 
   const pts = CALIBRATION_POINTS;
@@ -263,7 +305,7 @@ export function estimateDoseFromDeltaE(deltaE00, tempC = 25.0, rhPct = 50.0) {
     return {
       dosePpmHours: pts[pts.length - 1].dose,
       inRange: false,
-      status: 'OUT OF CALIBRATION RANGE (Sensor Saturation)'
+      status: 'OUTSIDE CALIBRATION RANGE'
     };
   }
 
@@ -274,11 +316,11 @@ export function estimateDoseFromDeltaE(deltaE00, tempC = 25.0, rhPct = 50.0) {
     if (normDelta >= p1.deltaE00 && normDelta <= p2.deltaE00) {
       const frac = (normDelta - p1.deltaE00) / (p2.deltaE00 - p1.deltaE00 + 1e-12);
       const dose = p1.dose + frac * (p2.dose - p1.dose);
-      return { dosePpmHours: Math.round(dose * 100) / 100, inRange: true, status: 'Valid Interpolation' };
+      return { dosePpmHours: Math.round(dose * 100) / 100, inRange: true, status: 'VALID' };
     }
   }
 
-  return { dosePpmHours: 0.0, inRange: true, status: 'Valid Interpolation' };
+  return { dosePpmHours: 0.0, inRange: true, status: 'VALID' };
 }
 
 // --- 8. Master Optical Exposure Analyzer ---
@@ -287,7 +329,7 @@ export function analyzeExposure(correctedRGB, tempC = 25.0, rhPct = 50.0, ccm = 
   if (typeof correctedRGB === 'string') {
     rgb = hexToRgb(correctedRGB);
   } else if (!correctedRGB) {
-    rgb = { r: 128, g: 128, b: 128 };
+    rgb = { r: 139, g: 76, b: 148 }; // Default unexposed Cu-PAN RGB
   }
 
   const rLin = srgbChannelToLinear(rgb.r ?? 0);
@@ -311,7 +353,11 @@ export function analyzeExposure(correctedRGB, tempC = 25.0, rhPct = 50.0, ccm = 
   }
 
   return {
+    chemistry: CHEMISTRY,
+    indicator: INDICATOR,
+    dose: dosePpmHours,
     estimatedDosePpmHours: dosePpmHours,
+    unit: DOSE_UNIT,
     alertLevel: matchedZone.level,
     alertColor: matchedZone.color,
     badgeClass: matchedZone.badgeClass,
@@ -320,6 +366,8 @@ export function analyzeExposure(correctedRGB, tempC = 25.0, rhPct = 50.0, ccm = 
     lab: { L: Math.round(lab.L * 100) / 100, a: Math.round(lab.a * 100) / 100, b: Math.round(lab.b * 100) / 100 },
     inRange,
     calibrationStatus: status,
+    confidence: inRange ? 0.94 : 0.40,
+    confidencePercent: inRange ? 94.0 : 40.0,
     envValid,
     envReason,
     rateFactor: Math.round(rateFactor * 100) / 100
@@ -422,7 +470,8 @@ export function colorToPPM(rgb, tempC = 25.0, rhPct = 50.0) {
   const analysis = analyzeExposure(rgb, tempC, rhPct);
   return {
     ppm: analysis.estimatedDosePpmHours,
-    confidence: 94.8,
+    dose: analysis.estimatedDosePpmHours,
+    confidence: analysis.confidencePercent,
     alertLevel: analysis.alertLevel,
     badgeClass: analysis.badgeClass,
     note: analysis.note

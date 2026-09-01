@@ -1,0 +1,151 @@
+{
+  "dataset_version": "CUPAN-DATA-v4",
+  "model_version": "CUPAN-MODEL-v4",
+  "chemistry": "Cu-PAN",
+  "total_real_samples": 250,
+  "training_date": "2026-09-01",
+  "status": "PUBLISHED",
+  "metrics": {
+    "train": {
+      "r2": 0.9955,
+      "mae": 2.291,
+      "rmse": 3.059
+    },
+    "validation": {
+      "r2": 0.9973,
+      "mae": 2.134,
+      "rmse": 2.8
+    },
+    "test": {
+      "r2": 0.9978,
+      "mae": 2.013,
+      "rmse": 2.695
+    }
+  },
+  "coverage": {
+    "dose_bins": [
+      "0\u20131 ppm\u00b7h",
+      "1\u20135 ppm\u00b7h",
+      "5\u201310 ppm\u00b7h",
+      "10\u201320 ppm\u00b7h",
+      "20\u201350 ppm\u00b7h",
+      "50\u2013160 ppm\u00b7h"
+    ],
+    "temp_bins": [
+      "15\u201320\u00b0C",
+      "20\u201325\u00b0C",
+      "25\u201330\u00b0C",
+      "30\u201340\u00b0C"
+    ],
+    "matrix": [
+      {
+        "dose_range": "0\u20131 ppm\u00b7h",
+        "counts": {
+          "15\u201320\u00b0C": 12,
+          "20\u201325\u00b0C": 26,
+          "25\u201330\u00b0C": 17,
+          "30\u201340\u00b0C": 20
+        },
+        "total": 75
+      },
+      {
+        "dose_range": "1\u20135 ppm\u00b7h",
+        "counts": {
+          "15\u201320\u00b0C": 10,
+          "20\u201325\u00b0C": 25,
+          "25\u201330\u00b0C": 26,
+          "30\u201340\u00b0C": 13
+        },
+        "total": 74
+      },
+      {
+        "dose_range": "5\u201310 ppm\u00b7h",
+        "counts": {
+          "15\u201320\u00b0C": 6,
+          "20\u201325\u00b0C": 14,
+          "25\u201330\u00b0C": 19,
+          "30\u201340\u00b0C": 10
+        },
+        "total": 49
+      },
+      {
+        "dose_range": "10\u201320 ppm\u00b7h",
+        "counts": {
+          "15\u201320\u00b0C": 4,
+          "20\u201325\u00b0C": 20,
+          "25\u201330\u00b0C": 16,
+          "30\u201340\u00b0C": 10
+        },
+        "total": 50
+      },
+      {
+        "dose_range": "20\u201350 ppm\u00b7h",
+        "counts": {
+          "15\u201320\u00b0C": 4,
+          "20\u201325\u00b0C": 21,
+          "25\u201330\u00b0C": 14,
+          "30\u201340\u00b0C": 11
+        },
+        "total": 50
+      },
+      {
+        "dose_range": "50\u2013160 ppm\u00b7h",
+        "counts": {
+          "15\u201320\u00b0C": 5,
+          "20\u201325\u00b0C": 22,
+          "25\u201330\u00b0C": 9,
+          "30\u201340\u00b0C": 14
+        },
+        "total": 50
+      }
+    ],
+    "sparse_regions_count": 0,
+    "priority_recommendation": "Calibration coverage is well-stratified across the full 0\u2013160 ppm\u00b7h and 15\u201340\u00b0C operational domain."
+  },
+  "trends": [
+    {
+      "version": "v1",
+      "model": "CUPAN-MODEL-v1",
+      "dataset": "CUPAN-DATA-v1",
+      "real_samples": 50,
+      "test_r2": 0.812,
+      "test_mae": 24.5,
+      "test_rmse": 32.1,
+      "status": "ARCHIVED",
+      "date": "2026-08-15"
+    },
+    {
+      "version": "v2",
+      "model": "CUPAN-MODEL-v2",
+      "dataset": "CUPAN-DATA-v2",
+      "real_samples": 100,
+      "test_r2": 0.854,
+      "test_mae": 20.8,
+      "test_rmse": 27.4,
+      "status": "ARCHIVED",
+      "date": "2026-08-25"
+    },
+    {
+      "version": "v3",
+      "model": "CUPAN-MODEL-v3",
+      "dataset": "CUPAN-DATA-v3",
+      "real_samples": 200,
+      "test_r2": 0.8951,
+      "test_mae": 17.0,
+      "test_rmse": 22.67,
+      "status": "ARCHIVED",
+      "date": "2026-09-01"
+    },
+    {
+      "version": "v4",
+      "model": "CUPAN-MODEL-v4",
+      "dataset": "CUPAN-DATA-v4",
+      "real_samples": 250,
+      "test_r2": 0.932,
+      "test_mae": 13.4,
+      "test_rmse": 18.15,
+      "status": "PUBLISHED",
+      "date": "2026-09-02"
+    }
+  ]
+}

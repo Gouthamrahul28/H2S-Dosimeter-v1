@@ -23,7 +23,7 @@ services:
     environment:
       - PORT=5000
       - MONGODB_URI=mongodb://mongodb:27017/h2s-dosimeter
-      - CALIBRATION_CURVE_VERSION=placeholder-v1
+      - CALIBRATION_CURVE_VERSION=cupan-cielab-v1
       - THRESHOLD_PPM_HOURS=80
     ports:
       - "5000:5000"

@@ -1,16 +1,16 @@
 """
 h2s_dosimeter.calibration.calibration_model
 ===========================================
-Pluggable Dose Calibration Models mapping optical coordinates (Lab, ΔE00)
+Pluggable Dose Calibration Models mapping Cu-PAN optical coordinates (Lab, ΔE00)
 and ambient environment (Temperature, Humidity) to estimated cumulative H₂S dose.
 
 SCIENTIFIC CALIBRATION PRINCIPLES:
 1. Dose is cumulative gas exposure: Dose = ∫ C(t) dt [ppm·hours].
-2. The color-to-dose relationship is an experimentally calibrated physical property of
-   the chemical substrate matrix. It MUST NOT be guessed or hardcoded as arbitrary RGB.
+2. Cu-PAN color response (Purple/Violet -> Yellow/Orange) is an experimentally calibrated physical property.
+   It MUST NOT be guessed or hardcoded as arbitrary RGB.
 3. If an input color is outside the experimentally calibrated domain, it MUST explicitly
-   report "OUTSIDE CALIBRATION RANGE" rather than silently extrapolating.
-4. Ambient Temperature and Relative Humidity influence chemical diffusion and reaction rates
+   report "OUTSIDE CALIBRATION RANGE" with valid: false rather than silently extrapolating.
+4. Ambient Temperature and Relative Humidity influence Cu-PAN chemical diffusion and reaction rates
    and are compensated via physical Arrhenius rate derating.
 """
 
@@ -21,17 +21,21 @@ import numpy as np
 from .calibration_dataset import CalibrationDataset, CalibrationRecord
 from ..color.delta_e import ciede2000
 
+CUPAN_VIRGIN_BASELINE_LAB = np.array([42.50, 38.20, -28.40], dtype=np.float64)
+
 
 @dataclass
 class ModelPredictionResult:
     """Estimated dose output and domain validity report."""
     estimated_dose_ppm_h: float
     is_calibrated_domain: bool
-    calibration_status: str       # "CALIBRATED", "OUTSIDE CALIBRATION RANGE", "INVALID"
+    calibration_status: str       # "VALID", "CALIBRATED", "OUTSIDE CALIBRATION RANGE", "INVALID"
     model_name: str
     confidence_score: float       # 0.0 to 100.0 %
     env_compensation_factor: float
     deltaE00_from_baseline: float
+    chemistry: str = "Cu-PAN"
+    unit: str = "ppm·h"
     warning_message: str = ""
 
     def to_dict(self) -> Dict:
@@ -39,16 +43,17 @@ class ModelPredictionResult:
 
 
 class BaseCalibrationModel(ABC):
-    """Abstract base class for all H₂S strip calibration models."""
+    """Abstract base class for all Cu-PAN strip calibration models."""
     
     def __init__(self, name: str = "BaseModel"):
         self.name = name
         self.is_fitted = False
-        self.baseline_lab = np.array([95.0, 0.0, 4.0], dtype=np.float64)
+        self.chemistry = "Cu-PAN"
+        self.baseline_lab = CUPAN_VIRGIN_BASELINE_LAB.copy()
         self.min_calibrated_delta_e = 0.0
-        self.max_calibrated_delta_e = 50.0
+        self.max_calibrated_delta_e = 75.0
         self.min_calibrated_dose = 0.0
-        self.max_calibrated_dose = 100.0
+        self.max_calibrated_dose = 160.0
         self.temp_coefficient = 0.005  # 0.5% per °C deviation from 25°C
         self.rh_coefficient = 0.0025   # 0.25% per % RH deviation from 50% RH
 
@@ -75,14 +80,14 @@ class BaseCalibrationModel(ABC):
         Formula:
             k_env = 1.0 + alpha*(T - 25.0) + beta*(RH - 50.0)
             
-        Higher temperature / humidity accelerates chemical darkening kinetics.
+        Higher temperature / humidity accelerates Cu-PAN reaction kinetics.
         Observed dose is normalized: Dose_std = Dose_obs / k_env.
         """
         t_delta = float(temp_c) - 25.0
         rh_delta = float(rh_pct) - 50.0
         k_env = 1.0 + (self.temp_coefficient * t_delta) + (self.rh_coefficient * rh_delta)
         # Guard against zero or negative environmental factor
-        return float(np.clip(k_env, 0.5, 2.0))
+        return float(np.clip(k_env, 0.40, 2.50))
 
     def evaluate(self, dataset: CalibrationDataset) -> Dict[str, float]:
         """Compute training/test metrics: MAE, RMSE, R²."""
@@ -123,7 +128,7 @@ class BaseCalibrationModel(ABC):
 
 class PiecewiseInterpolationModel(BaseCalibrationModel):
     """
-    Non-linear piecewise monotonic interpolation model over sorted experimental anchors.
+    Non-linear piecewise monotonic interpolation model over sorted experimental Cu-PAN anchors.
     """
     
     def __init__(self, name: str = "Piecewise-Interpolation-Model"):
@@ -134,13 +139,14 @@ class PiecewiseInterpolationModel(BaseCalibrationModel):
     def fit(self, dataset: CalibrationDataset) -> 'PiecewiseInterpolationModel':
         if len(dataset) < 2:
             raise ValueError(f"Calibration dataset requires at least 2 records, got {len(dataset)}")
+        if dataset.chemistry != "Cu-PAN":
+            raise ValueError(f"Model requires 'Cu-PAN' dataset, got '{dataset.chemistry}'")
             
         self.baseline_lab = np.asarray(dataset.reference_baseline_lab, dtype=np.float64)
         
         # Extract ΔE00 and Doses
         records_sorted = sorted(dataset.records, key=lambda r: r.deltaE00)
         
-        # Ensure 0 baseline point is present
         de_list = [0.0]
         dose_list = [0.0]
         for r in records_sorted:
@@ -170,24 +176,23 @@ class PiecewiseInterpolationModel(BaseCalibrationModel):
             
         lab_arr = np.asarray(lab, dtype=np.float64).flatten()
         
-        # Compute ΔE00 if not supplied
+        # Compute ΔE00 from baseline if not supplied
         if deltaE00 is None:
             de = ciede2000(self.baseline_lab, lab_arr)
         else:
             de = float(deltaE00)
             
-        # Domain validation: allow 10% safety margin before hard rejection
-        margin = 0.10 * (self.max_calibrated_delta_e - self.min_calibrated_delta_e)
-        is_in_domain = (de >= (self.min_calibrated_delta_e - 0.5)) and (de <= (self.max_calibrated_delta_e + margin))
+        # Strict out-of-range protection: do not extrapolate
+        is_in_domain = (de >= self.min_calibrated_delta_e) and (de <= self.max_calibrated_delta_e)
         
-        status = "CALIBRATED"
+        status = "VALID"
         warning = ""
         confidence = 95.0
         
         if not is_in_domain:
             status = "OUTSIDE CALIBRATION RANGE"
-            warning = f"Measured ΔE00 ({de:.2f}) exceeds experimental calibration limit ({self.max_calibrated_delta_e:.2f})."
-            confidence = max(20.0, 95.0 - (de - self.max_calibrated_delta_e) * 5.0)
+            warning = "OUTSIDE_CALIBRATION_RANGE"
+            confidence = max(10.0, 95.0 - abs(de - self.max_calibrated_delta_e) * 8.0)
             
         # Piecewise 1D interpolation
         raw_dose = float(np.interp(de, self.anchor_delta_e, self.anchor_doses))
@@ -204,13 +209,15 @@ class PiecewiseInterpolationModel(BaseCalibrationModel):
             confidence_score=round(confidence, 1),
             env_compensation_factor=round(k_env, 4),
             deltaE00_from_baseline=round(de, 2),
+            chemistry="Cu-PAN",
+            unit="ppm·h",
             warning_message=warning
         )
 
 
 class PolynomialRegressionModel(BaseCalibrationModel):
     """
-    Polynomial surface regression model with environmental interaction terms and Ridge regularization.
+    Polynomial surface regression model for Cu-PAN with environmental interaction terms.
     """
     
     def __init__(self, degree: int = 2, alpha: float = 1e-3, name: str = "Polynomial-Surface-Regression"):
@@ -218,8 +225,6 @@ class PolynomialRegressionModel(BaseCalibrationModel):
         self.degree = degree
         self.alpha = alpha
         self.weights = None
-        self.feature_means = None
-        self.feature_stds = None
 
     def _build_features(self, delta_es: np.ndarray, labs: np.ndarray, envs: np.ndarray) -> np.ndarray:
         """Construct multi-variable feature matrix."""
@@ -241,6 +246,8 @@ class PolynomialRegressionModel(BaseCalibrationModel):
     def fit(self, dataset: CalibrationDataset) -> 'PolynomialRegressionModel':
         if len(dataset) < 4:
             raise ValueError(f"Polynomial regression requires at least 4 calibration points, got {len(dataset)}")
+        if dataset.chemistry != "Cu-PAN":
+            raise ValueError(f"Model requires 'Cu-PAN' dataset, got '{dataset.chemistry}'")
             
         self.baseline_lab = np.asarray(dataset.reference_baseline_lab, dtype=np.float64)
         labs, delta_es, doses, envs = dataset.get_arrays()
@@ -250,11 +257,9 @@ class PolynomialRegressionModel(BaseCalibrationModel):
         self.min_calibrated_dose = float(np.min(doses))
         self.max_calibrated_dose = float(np.max(doses))
         
-        # Build features
         X = self._build_features(delta_es, labs, envs)
         y = doses
         
-        # Ridge Regression: w = (X^T X + alpha * I)^(-1) X^T y
         n_features = X.shape[1]
         i_reg = np.eye(n_features)
         i_reg[0, 0] = 0.0  # Do not regularize bias term
@@ -284,14 +289,12 @@ class PolynomialRegressionModel(BaseCalibrationModel):
         
         X = self._build_features(de_arr, lab_arr, env_arr)
         pred_dose = float((X @ self.weights).item())
-        
-        # Constrain to non-negative
         pred_dose = max(0.0, pred_dose)
         
-        is_in_domain = (de >= (self.min_calibrated_delta_e - 0.5)) and (de <= (self.max_calibrated_delta_e * 1.10))
-        status = "CALIBRATED" if is_in_domain else "OUTSIDE CALIBRATION RANGE"
-        warning = "" if is_in_domain else f"Measured ΔE00 ({de:.2f}) is outside polynomial calibration domain."
-        confidence = 92.0 if is_in_domain else max(20.0, 92.0 - (de - self.max_calibrated_delta_e) * 4.0)
+        is_in_domain = (de >= self.min_calibrated_delta_e) and (de <= self.max_calibrated_delta_e)
+        status = "VALID" if is_in_domain else "OUTSIDE CALIBRATION RANGE"
+        warning = "" if is_in_domain else "OUTSIDE_CALIBRATION_RANGE"
+        confidence = 92.0 if is_in_domain else max(10.0, 92.0 - abs(de - self.max_calibrated_delta_e) * 8.0)
         
         k_env = self.compute_env_factor(temp_c=temperature_c, rh_pct=humidity_percent)
         
@@ -303,6 +306,8 @@ class PolynomialRegressionModel(BaseCalibrationModel):
             confidence_score=round(confidence, 1),
             env_compensation_factor=round(k_env, 4),
             deltaE00_from_baseline=round(de, 2),
+            chemistry="Cu-PAN",
+            unit="ppm·h",
             warning_message=warning
         )
 
@@ -313,7 +318,7 @@ def create_calibration_model(
     **kwargs
 ) -> BaseCalibrationModel:
     """
-    Factory function for calibration models.
+    Factory function for Cu-PAN calibration models.
     
     Args:
         model_type: 'interpolation' (default) or 'polynomial'.
