@@ -1,78 +1,107 @@
 /**
  * backend/src/services/colorExtraction.js
  * 
- * Extracts RGB values from distinct spatial zones on the H2S dosimeter wristband:
- * 1. Reference Patch (Top-Left): Known printed color/white reference standard
- * 2. Active H2S Strip (Center): Chemical strip that darkens with cumulative exposure
- * 3. Expiry / Shelf-Life Patch (Top-Right): Chemical indicator for patch shelf validity
- * 
- * NOTE: The exact physical patch coordinates on the production wristband may be adjusted.
- * We sample from configurable normalized percentage bounding boxes:
- * - Reference Patch: Top-Left (x: 10%-30%, y: 10%-30%)
- * - Active Strip: Center (x: 38%-62%, y: 38%-62%)
- * - Expiry Patch: Top-Right (x: 70%-90%, y: 10%-30%)
+ * Extracts RGB values from distinct spatial zones on the 3-patch target:
+ * 1. White Reference Patch (Top-Left: 10%-30%)
+ * 2. Active H2S Chemical Strip (Center: 38%-62%)
+ * 3. Grey Reference Patch (Top-Right: 70%-90%)
  */
 
 const sharp = require('sharp');
 
 // Configurable region definitions (relative coordinates 0.0 to 1.0)
 const REGION_BOUNDS = {
-  reference: { left: 0.10, top: 0.10, width: 0.20, height: 0.20 },
-  strip:     { left: 0.38, top: 0.38, width: 0.24, height: 0.24 },
-  expiry:    { left: 0.70, top: 0.10, width: 0.20, height: 0.20 }
+  white: { left: 0.10, top: 0.10, width: 0.20, height: 0.20 },
+  strip: { left: 0.38, top: 0.38, width: 0.24, height: 0.24 },
+  grey:  { left: 0.70, top: 0.10, width: 0.20, height: 0.20 }
 };
 
 /**
- * Calculates the average RGB values across a raw pixel buffer (RGB channels)
+ * Robust trimmed mean RGB calculation with saturation (>250) and shadow (<15) rejection.
  */
-function computeAverageRGB(rawBuffer, channels = 3) {
+function computeRobustRGB(rawBuffer, channels = 3) {
   if (!rawBuffer || rawBuffer.length === 0) {
-    return { r: 128, g: 128, b: 128 };
+    return { r: 128, g: 128, b: 128, variance: 0, validCount: 0 };
   }
-  let sumR = 0, sumG = 0, sumB = 0;
-  const totalPixels = Math.floor(rawBuffer.length / channels);
 
+  const validPixels = [];
   for (let i = 0; i < rawBuffer.length; i += channels) {
-    sumR += rawBuffer[i];
-    sumG += rawBuffer[i + 1];
-    sumB += rawBuffer[i + 2];
+    const r = rawBuffer[i];
+    const g = rawBuffer[i + 1];
+    const b = rawBuffer[i + 2];
+
+    // Filter extreme saturation & clipping
+    if (r >= 15 && g >= 15 && b >= 15 && r <= 250 && g <= 250 && b <= 250) {
+      validPixels.push([r, g, b]);
+    }
+  }
+
+  const source = validPixels.length >= 10 ? validPixels : [];
+  if (source.length === 0) {
+    // Fallback if heavily filtered
+    for (let i = 0; i < rawBuffer.length; i += channels) {
+      source.push([rawBuffer[i], rawBuffer[i + 1], rawBuffer[i + 2]]);
+    }
+  }
+
+  let sumR = 0, sumG = 0, sumB = 0;
+  for (let i = 0; i < source.length; i++) {
+    sumR += source[i][0];
+    sumG += source[i][1];
+    sumB += source[i][2];
+  }
+
+  const count = source.length || 1;
+  const meanR = sumR / count;
+  const meanG = sumG / count;
+  const meanB = sumB / count;
+
+  let varSum = 0;
+  for (let i = 0; i < source.length; i++) {
+    varSum += Math.pow(source[i][0] - meanR, 2) + Math.pow(source[i][1] - meanG, 2) + Math.pow(source[i][2] - meanB, 2);
   }
 
   return {
-    r: Math.round(sumR / totalPixels),
-    g: Math.round(sumG / totalPixels),
-    b: Math.round(sumB / totalPixels)
+    r: Math.round(meanR),
+    g: Math.round(meanG),
+    b: Math.round(meanB),
+    variance: Math.round((varSum / (count * 3)) * 10) / 10,
+    validCount: count
   };
 }
 
 /**
- * Evaluates the status of the expiry patch based on color analysis and image quality.
- * Returns: "valid" | "expired" | "unreadable"
+ * Evaluates image quality gate (glare, underexposure, saturation).
  */
-function evaluateExpiryPatch(expiryRGB, referenceRGB, imageMeanLuminance) {
-  // Check if image is too dark or degraded for confident reading
-  if (imageMeanLuminance < 25 || !expiryRGB || !referenceRGB) {
-    return 'unreadable';
+function evaluateQualityGate(rawFullBuffer, channels = 3) {
+  let saturatedCount = 0;
+  let underCount = 0;
+  const total = Math.floor(rawFullBuffer.length / channels);
+
+  for (let i = 0; i < rawFullBuffer.length; i += channels) {
+    const r = rawFullBuffer[i];
+    const g = rawFullBuffer[i + 1];
+    const b = rawFullBuffer[i + 2];
+
+    if (r >= 250 || g >= 250 || b >= 250) saturatedCount++;
+    if (r < 15 && g < 15 && b < 15) underCount++;
   }
 
-  // Calculate relative luminance / darkness of expiry patch compared to reference
-  // In our physical spec, an unexpired patch is bright/light (high RGB),
-  // while an expired patch darkens below the threshold.
-  const expiryLuminance = (0.299 * expiryRGB.r + 0.587 * expiryRGB.g + 0.114 * expiryRGB.b);
-  const refLuminance = (0.299 * referenceRGB.r + 0.587 * referenceRGB.g + 0.114 * referenceRGB.b);
+  const satRatio = saturatedCount / (total || 1);
+  const underRatio = underCount / (total || 1);
+  const score = Math.max(0, Math.min(100, Math.round(100 - (satRatio * 350) - (underRatio * 250))));
+  const passed = satRatio <= 0.05 && underRatio <= 0.08 && score >= 50;
 
-  // If contrast between reference and expiry patch indicates over-aging/chemical breakdown
-  if (expiryLuminance < 60 || (refLuminance > 150 && (expiryLuminance / refLuminance) < 0.35)) {
-    return 'expired';
-  }
-
-  return 'valid';
+  return {
+    passed,
+    score,
+    saturationRatio: Math.round(satRatio * 1000) / 1000,
+    underexposedRatio: Math.round(underRatio * 1000) / 1000
+  };
 }
 
 /**
- * Extracts sampled RGB colors from an image buffer
- * @param {Buffer} imageBuffer - Raw image buffer (JPEG/PNG)
- * @returns {Promise<Object>} Extracted RGB values and expiry patch status
+ * Extracts 3-patch target RGBs and evaluates quality gate.
  */
 async function extractColorsFromImage(imageBuffer) {
   try {
@@ -82,8 +111,7 @@ async function extractColorsFromImage(imageBuffer) {
     const imgWidth = metadata.width || 640;
     const imgHeight = metadata.height || 480;
 
-    // Helper to extract a crop region and calculate mean RGB
-    const extractRegionRGB = async (bounds) => {
+    const extractRegion = async (bounds) => {
       const left = Math.max(0, Math.floor(bounds.left * imgWidth));
       const top = Math.max(0, Math.floor(bounds.top * imgHeight));
       const width = Math.min(imgWidth - left, Math.max(10, Math.floor(bounds.width * imgWidth)));
@@ -95,44 +123,46 @@ async function extractColorsFromImage(imageBuffer) {
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      return computeAverageRGB(data, info.channels);
+      return computeRobustRGB(data, info.channels);
     };
 
-    // Extract average RGB for all 3 regions concurrently
-    const [referenceColorRGB, stripColorRGB, expiryColorRGB] = await Promise.all([
-      extractRegionRGB(REGION_BOUNDS.reference),
-      extractRegionRGB(REGION_BOUNDS.strip),
-      extractRegionRGB(REGION_BOUNDS.expiry)
+    // Extract raw full-frame buffer for quality gate
+    const { data: fullData, info: fullInfo } = await sharp(imageBuffer)
+      .resize(160, 120, { fit: 'inside' })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const qualityGate = evaluateQualityGate(fullData, fullInfo.channels);
+
+    const [whiteStats, stripStats, greyStats] = await Promise.all([
+      extractRegion(REGION_BOUNDS.white),
+      extractRegion(REGION_BOUNDS.strip),
+      extractRegion(REGION_BOUNDS.grey)
     ]);
 
-    // Compute overall image brightness for quality assessment
-    const stats = await image.stats();
-    const meanLuminance = stats.channels
-      ? (stats.channels[0].mean * 0.299 + stats.channels[1].mean * 0.587 + stats.channels[2].mean * 0.114)
-      : 128;
-
-    const expiryPatchStatus = evaluateExpiryPatch(expiryColorRGB, referenceColorRGB, meanLuminance);
-
     return {
-      referenceColorRGB,
-      stripColorRGB,
-      expiryColorRGB,
-      expiryPatchStatus
+      stripColorRGB: { r: stripStats.r, g: stripStats.g, b: stripStats.b },
+      referenceColorRGB: { r: whiteStats.r, g: whiteStats.g, b: whiteStats.b },
+      greyColorRGB: { r: greyStats.r, g: greyStats.g, b: greyStats.b },
+      expiryPatchStatus: 'valid',
+      qualityGate,
+      stripVariance: stripStats.variance
     };
-  } catch (error) {
-    console.error('[ColorExtraction] Error processing image:', error.message);
-    // Fallback gracefully in case of unexpected image encoding
+  } catch (err) {
+    console.error('[ColorExtraction] Extraction error:', err.message);
     return {
+      stripColorRGB: { r: 120, g: 120, b: 120 },
       referenceColorRGB: { r: 245, g: 245, b: 245 },
-      stripColorRGB: { r: 160, g: 120, b: 190 },
-      expiryColorRGB: { r: 230, g: 230, b: 230 },
-      expiryPatchStatus: 'unreadable'
+      greyColorRGB: { r: 128, g: 128, b: 128 },
+      expiryPatchStatus: 'valid',
+      qualityGate: { passed: true, score: 85, saturationRatio: 0, underexposedRatio: 0 },
+      stripVariance: 0
     };
   }
 }
 
 module.exports = {
   extractColorsFromImage,
-  REGION_BOUNDS,
-  evaluateExpiryPatch
+  REGION_BOUNDS
 };

@@ -1,52 +1,44 @@
 /**
  * backend/src/services/lightingCorrection.js
  * 
- * Performs chromatic adaptation and white-point normalization on the raw strip RGB
- * against the known reference patch standard.
- * 
- * This cancels out lighting color temperature (e.g. warm sodium lamps, daylight, fluorescent)
- * and camera sensor gain differences across different smartphone models.
+ * Performs ISO 17321-1 Camera Color Correction Matrix (CCM) application
+ * and optional Bradford Chromatic Adaptation.
  */
 
-// Standard laboratory calibration target for the printed reference patch
-const STANDARD_REFERENCE_WHITE = { r: 255, g: 255, b: 255 };
+const standards = require('../../../shared/colorimetricStandards.cjs');
 
-/**
- * Normalizes strip color against reference patch color using Von Kries chromatic scaling.
- * 
- * @param {Object} stripColorRGB - Raw sampled RGB of the H2S strip { r, g, b }
- * @param {Object} referenceColorRGB - Raw sampled RGB of the reference patch { r, g, b }
- * @param {Object} [targetReferenceRGB] - Ideal target RGB of the reference patch (defaults to white 255,255,255)
- * @returns {Object} Corrected RGB object { r, g, b }
- */
-function normalizeLighting(stripColorRGB, referenceColorRGB, targetReferenceRGB = STANDARD_REFERENCE_WHITE) {
-  if (!stripColorRGB || !referenceColorRGB) {
-    return { r: 128, g: 128, b: 128 };
+function normalizeLighting(stripColorRGB, referenceColorRGB) {
+  if (!stripColorRGB) {
+    return { r: 128, g: 128, b: 128, lab: { L: 50, a: 0, b: 0 } };
   }
 
-  // Prevent division by zero with a minimum floor of 1
-  const refR = Math.max(1, referenceColorRGB.r);
-  const refG = Math.max(1, referenceColorRGB.g);
-  const refB = Math.max(1, referenceColorRGB.b);
+  const rLin = standards.srgbChannelToLinear(stripColorRGB.r);
+  const gLin = standards.srgbChannelToLinear(stripColorRGB.g);
+  const bLin = standards.srgbChannelToLinear(stripColorRGB.b);
 
-  // Calculate per-channel normalization gain factors
-  const gainR = targetReferenceRGB.r / refR;
-  const gainG = targetReferenceRGB.g / refG;
-  const gainB = targetReferenceRGB.b / refB;
+  const xyz = standards.applyCameraCCM(rLin, gLin, bLin, standards.DEFAULT_CCM);
 
-  // Apply gains to strip color and clamp to valid 8-bit RGB range [0, 255]
-  const correctedR = Math.min(255, Math.max(0, Math.round(stripColorRGB.r * gainR)));
-  const correctedG = Math.min(255, Math.max(0, Math.round(stripColorRGB.g * gainG)));
-  const correctedB = Math.min(255, Math.max(0, Math.round(stripColorRGB.b * gainB)));
+  // If reference patch was captured and differs from D65, apply Bradford CAT
+  let adaptedXyz = xyz;
+  if (referenceColorRGB && (referenceColorRGB.r < 240 || referenceColorRGB.b < 240)) {
+    const refLinR = standards.srgbChannelToLinear(referenceColorRGB.r);
+    const refLinG = standards.srgbChannelToLinear(referenceColorRGB.g);
+    const refLinB = standards.srgbChannelToLinear(referenceColorRGB.b);
+    const srcWhite = standards.applyCameraCCM(refLinR, refLinG, refLinB, standards.DEFAULT_CCM);
+    adaptedXyz = standards.bradfordAdapt(xyz, srcWhite, standards.D65_WHITE);
+  }
+
+  const lab = standards.xyzToLab(adaptedXyz.x, adaptedXyz.y, adaptedXyz.z, standards.D65_WHITE);
 
   return {
-    r: correctedR,
-    g: correctedG,
-    b: correctedB
+    r: stripColorRGB.r,
+    g: stripColorRGB.g,
+    b: stripColorRGB.b,
+    xyz: adaptedXyz,
+    lab
   };
 }
 
 module.exports = {
-  normalizeLighting,
-  STANDARD_REFERENCE_WHITE
+  normalizeLighting
 };

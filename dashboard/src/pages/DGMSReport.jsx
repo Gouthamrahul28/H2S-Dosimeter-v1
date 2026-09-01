@@ -111,10 +111,10 @@ export default function DGMSReport() {
       {/* Top Controls Bar (Hidden during Print) */}
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#f8fafc', letterSpacing: '-0.02em' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
             DGMS / OISD Statutory Compliance Register
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: '4px' }}>
             Official occupational health exposure audit register conforming to DGMS & OISD-STD-114 norms.
           </p>
         </div>
@@ -131,8 +131,8 @@ export default function DGMSReport() {
           </button>
 
           <div className="glass-card" style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Calendar size={15} color="#06b6d4" />
-            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>From:</span>
+            <Calendar size={15} color="var(--accent-cyan)" />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600' }}>From:</span>
             <input
               type="date"
               className="input-control"
@@ -140,7 +140,7 @@ export default function DGMSReport() {
               onChange={(e) => setFromDate(e.target.value)}
               style={{ padding: '4px 8px', fontSize: '0.8rem' }}
             />
-            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>To:</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600' }}>To:</span>
             <input
               type="date"
               className="input-control"
@@ -163,31 +163,31 @@ export default function DGMSReport() {
       </div>
 
       {/* Official Statutory Header (Visible in web + print format) */}
-      <div className="glass-card" style={{ padding: '24px', borderLeft: '4px solid #06b6d4' }}>
+      <div className="glass-card" style={{ padding: '24px', borderLeft: '4px solid var(--accent-cyan)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <Building size={18} color="#06b6d4" />
-              <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#38bdf8', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              <Building size={18} color="var(--accent-cyan)" />
+              <span style={{ fontSize: '0.78rem', fontWeight: '800', color: 'var(--accent-cyan)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                 {facilityConfig.zone} &bull; OISD-STD-114
               </span>
             </div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#f8fafc' }}>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-primary)' }}>
               Form VI-B: Statutory Cumulative Toxic Gas Register (Hydrogen Sulfide)
             </h2>
-            <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '6px', lineHeight: '1.5' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '6px', lineHeight: '1.5' }}>
               <strong>Certified Asset / Facility:</strong> {facilityConfig.facilityName} ({facilityConfig.assetCode})<br />
               <strong>Audit Period:</strong> {fromDate} to {toDate} &bull; <strong>Cumulative Permissible Limit:</strong> 80.0 ppm·hours
             </div>
           </div>
 
           <div style={{ textAlign: 'right', minWidth: '200px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Report Tracking ID</span>
-            <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: '#f8fafc' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Report Tracking ID</span>
+            <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
               DGMS-H2S-{fromDate.replace(/-/g, '')}-{toDate.replace(/-/g, '')}
             </strong>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginTop: '4px' }}>
-              Auditor: <strong>{facilityConfig.officerName}</strong>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>
+              Auditor: <strong style={{ color: 'var(--text-primary)' }}>{facilityConfig.officerName}</strong>
             </span>
           </div>
         </div>
@@ -196,29 +196,29 @@ export default function DGMSReport() {
       {/* Summary KPI Highlights */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         <div className="glass-card" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase' }}>Audited Cohort</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#f8fafc', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Audited Cohort</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
             {totalAudited}
           </div>
         </div>
 
         <div className="glass-card" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase' }}>Compliant Personnel</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#34d399', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Compliant Personnel</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
             {compliantTotal}
           </div>
         </div>
 
         <div className="glass-card" style={{ padding: '16px 20px', border: overThresholdTotal > 0 ? '1px solid rgba(244,63,94,0.4)' : '1px solid var(--border-subtle)' }}>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase' }}>Statutory Violations (&gt;80 ppm·h)</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: overThresholdTotal > 0 ? '#fb7185' : '#f8fafc', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Statutory Violations (&gt;80 ppm·h)</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: overThresholdTotal > 0 ? 'var(--accent-rose)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
             {overThresholdTotal}
           </div>
         </div>
 
         <div className="glass-card" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase' }}>Compliance Index</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#38bdf8', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>Compliance Index</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
             {complianceRate}%
           </div>
         </div>
@@ -227,10 +227,10 @@ export default function DGMSReport() {
       {/* Main Tabular Register */}
       <div className="glass-card" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#f8fafc' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)' }}>
             Certified Exposure Schedule
           </h3>
-          <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             Audited Records: {reportData.length}
           </span>
         </div>
@@ -259,20 +259,20 @@ export default function DGMSReport() {
               ) : (
                 reportData.map((row, idx) => (
                   <tr key={row.workerId} className={row.overThreshold ? 'row-over-threshold' : ''}>
-                    <td style={{ color: '#64748b', fontSize: '0.8rem' }}>{idx + 1}</td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{idx + 1}</td>
                     <td>
-                      <strong style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>
+                      <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
                         {row.workerId}
                       </strong>
                     </td>
                     <td>
-                      <strong style={{ color: '#f1f5f9' }}>{row.name}</strong>
+                      <strong style={{ color: 'var(--text-primary)' }}>{row.name}</strong>
                     </td>
                     <td>
-                      <span style={{ color: '#94a3b8' }}>{row.department}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{row.department}</span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', color: '#cbd5e1' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                         {row.readingCount}
                       </span>
                     </td>
@@ -281,13 +281,13 @@ export default function DGMSReport() {
                         style={{
                           fontFamily: 'var(--font-mono)',
                           fontSize: '1rem',
-                          color: row.overThreshold ? '#fb7185' : '#f8fafc'
+                          color: row.overThreshold ? 'var(--accent-rose)' : 'var(--text-primary)'
                         }}
                       >
                         {(row.totalDosePpmHours || 0).toFixed(1)}
                       </strong>
                     </td>
-                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', color: '#94a3b8' }}>
+                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                       {row.thresholdPpmHours || 80}
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -305,8 +305,8 @@ export default function DGMSReport() {
         </div>
 
         {/* Regulatory Statutory Notes */}
-        <div style={{ marginTop: '20px', padding: '14px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.5' }}>
-          <strong>Statutory Compliance Requirement:</strong> Conforming to DGMS Circular No. 3 (Occupational Health & Hygiene) and OISD-STD-114 Standards, this report certifies the passive dosimeter optical readings registered during the specified audit cycle. Workers flagged as 'OVER LIMIT' require immediate removal from sour operations and mandatory spirometric re-examination.
+        <div style={{ marginTop: '20px', padding: '14px', background: 'var(--bg-table-header)', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+          <strong style={{ color: 'var(--text-primary)' }}>Statutory Compliance Requirement:</strong> Conforming to DGMS Circular No. 3 (Occupational Health & Hygiene) and OISD-STD-114 Standards, this report certifies the passive dosimeter optical readings registered during the specified audit cycle. Workers flagged as 'OVER LIMIT' require immediate removal from sour operations and mandatory spirometric re-examination.
         </div>
 
         {/* Official Printable Sign-off Block */}
@@ -340,11 +340,11 @@ export default function DGMSReport() {
             padding: '16px'
           }}
         >
-          <div className="glass-card" style={{ width: '100%', maxWidth: '520px', padding: '24px', background: '#0e1422' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#f8fafc', marginBottom: '4px' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '520px', padding: '24px', background: 'var(--bg-card-solid)' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>
               Statutory Facility & Auditor Metadata
             </h2>
-            <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginBottom: '18px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
               Configure facility particulars and certifying assessor credentials for printed DGMS / OISD registers.
             </p>
 

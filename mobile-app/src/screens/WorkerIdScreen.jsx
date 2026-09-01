@@ -102,10 +102,10 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
             DGMS / OISD FIELD DOSIMETRY
           </span>
         </div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', color: '#f8fafc' }}>
+        <h1 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
           End-of-Shift Scan
         </h1>
-        <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '4px' }}>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
           Photograph worker wristband to record cumulative H₂S exposure dose
         </p>
       </div>
@@ -113,7 +113,7 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
       <form onSubmit={handleNext} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Worker ID Section */}
         <div className="glass-panel" style={{ padding: '16px' }}>
-          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#94a3b8', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             WORKER IDENTIFICATION
           </label>
 
@@ -129,7 +129,7 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
             />
             <User
               size={20}
-              color="#94a3b8"
+              color="var(--text-muted)"
               style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)' }}
             />
           </div>
@@ -137,7 +137,7 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
           {/* Quick Worker Selector Chips */}
           {workersList.length > 0 && (
             <div style={{ marginTop: '12px' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                 Quick Select Active Worker:
               </span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -147,9 +147,9 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
                     type="button"
                     onClick={() => setWorkerId(w.workerId)}
                     style={{
-                      background: workerId === w.workerId ? 'rgba(6, 182, 212, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                      border: workerId === w.workerId ? '1px solid #06b6d4' : '1px solid rgba(255, 255, 255, 0.1)',
-                      color: workerId === w.workerId ? '#38bdf8' : '#cbd5e1',
+                      background: workerId === w.workerId ? 'rgba(6, 182, 212, 0.2)' : 'var(--bg-input)',
+                      border: workerId === w.workerId ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
+                      color: workerId === w.workerId ? 'var(--accent-cyan)' : 'var(--text-secondary)',
                       borderRadius: '8px',
                       padding: '5px 10px',
                       fontSize: '0.75rem',
@@ -170,19 +170,19 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
               style={{
                 marginTop: '12px',
                 padding: '10px 12px',
-                background: 'rgba(15, 23, 42, 0.6)',
+                background: 'var(--bg-card-solid)',
                 borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.06)',
+                border: '1px solid var(--border-subtle)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}
             >
               <div>
-                <strong style={{ fontSize: '0.9rem', color: '#f8fafc', display: 'block' }}>{matchedWorker.name}</strong>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{matchedWorker.department}</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', display: 'block' }}>{matchedWorker.name}</strong>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{matchedWorker.department}</span>
               </div>
-              <span className="badge badge-cyan" style={{ fontSize: '0.7rem' }}>VERIFIED</span>
+              <span className="badge badge-safe" style={{ fontSize: '0.7rem' }}>VERIFIED</span>
             </div>
           )}
 
@@ -201,13 +201,13 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Activity size={15} color={doseInfo.overThreshold ? '#fb7185' : '#34d399'} />
-                <span style={{ fontSize: '0.75rem', color: doseInfo.overThreshold ? '#fecdd3' : '#a7f3d0' }}>
+                <Activity size={15} color={doseInfo.overThreshold ? 'var(--accent-rose)' : 'var(--accent-emerald)'} />
+                <span style={{ fontSize: '0.75rem', color: doseInfo.overThreshold ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
                   Cumulative: <strong>{doseInfo.totalDosePpmHours} ppm·h</strong> ({doseInfo.readingCount} shifts)
                 </span>
               </div>
               {doseInfo.overThreshold && (
-                <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#fb7185' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--accent-rose)' }}>
                   OVER 80 LIMIT
                 </span>
               )}
@@ -218,7 +218,7 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
         {/* Shift Selection Section */}
         <div className="glass-panel" style={{ padding: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: '600', color: '#94a3b8' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
               SHIFT CODE
             </label>
             <button
@@ -227,7 +227,7 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#06b6d4',
+                color: 'var(--accent-cyan)',
                 fontSize: '0.75rem',
                 cursor: 'pointer',
                 textDecoration: 'underline'
@@ -251,28 +251,28 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
                     type="button"
                     onClick={() => handleSelectShift(s.letter)}
                     style={{
-                      background: shiftLetter === s.letter ? 'linear-gradient(135deg, #0284c7, #06b6d4)' : 'rgba(15, 23, 42, 0.7)',
+                      background: shiftLetter === s.letter ? 'linear-gradient(135deg, #0284c7, #06b6d4)' : 'var(--bg-input)',
                       border: shiftLetter === s.letter ? '1px solid #38bdf8' : '1px solid var(--border-subtle)',
                       borderRadius: '10px',
                       padding: '10px 6px',
-                      color: '#f8fafc',
+                      color: shiftLetter === s.letter ? '#ffffff' : 'var(--text-primary)',
                       cursor: 'pointer',
                       textAlign: 'center',
                       transition: 'all 0.2s ease'
                     }}
                   >
                     <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{s.label}</div>
-                    <div style={{ fontSize: '0.65rem', color: shiftLetter === s.letter ? '#e0f2fe' : '#94a3b8', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.65rem', color: shiftLetter === s.letter ? '#e0f2fe' : 'var(--text-secondary)', marginTop: '2px' }}>
                       {s.time}
                     </div>
                   </button>
                 ))}
               </div>
 
-              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar size={16} color="#94a3b8" />
-                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Generated ID:</span>
-                <strong style={{ fontSize: '0.9rem', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={16} color="var(--text-muted)" />
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Generated ID:</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
                   {getTodayShiftId(shiftLetter)}
                 </strong>
               </div>

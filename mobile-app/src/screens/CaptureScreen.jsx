@@ -1,22 +1,24 @@
 import React, { useState } from 'react';
-import { ArrowLeft, RefreshCw, AlertCircle, CheckCircle2, Shield, Info } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, Camera, Video, Sparkles } from 'lucide-react';
 import CameraCapture from '../components/CameraCapture';
+import PicScanCapture from '../components/PicScanCapture';
 import { submitReading } from '../services/api';
 
 const PROCESSING_STEPS = [
-  'Capturing optical frame...',
-  'Extracting RGB from Reference & Strip zones...',
-  'Applying chromatic lighting normalization...',
-  'Calculating cumulative ppm·hours...'
+  'Capturing optical frame & checking Quality Gate...',
+  'Extracting 3-patch target [White | Grey | Strip]...',
+  'Applying ISO 17321-1 Camera CCM & CIELAB transform...',
+  'Calculating cumulative exposure dose via CIEDE2000 kinetics...'
 ];
 
 export default function CaptureScreen({ workerData, onBack, onComplete }) {
+  const [captureMode, setCaptureMode] = useState('pic-scan'); // 'pic-scan' | 'live-camera'
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
   const [error, setError] = useState(null);
   const [lastPayload, setLastPayload] = useState(null);
 
-  const handleCapture = async ({ imageBase64, ambientTemp, ambientHumidity }) => {
+  const handleCapture = async ({ imageBase64, ambientTemp, ambientHumidity, diagnostics }) => {
     setError(null);
     setIsProcessing(true);
     setProcessingStep(0);
@@ -58,14 +60,14 @@ export default function CaptureScreen({ workerData, onBack, onComplete }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '16px', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '14px 16px', position: 'relative' }}>
       {/* Top Navigation Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
         <button
           onClick={onBack}
           disabled={isProcessing}
           style={{
-            background: 'rgba(255, 255, 255, 0.08)',
+            background: 'var(--bg-card-hover)',
             border: '1px solid var(--border-subtle)',
             borderRadius: '10px',
             width: '38px',
@@ -73,18 +75,18 @@ export default function CaptureScreen({ workerData, onBack, onComplete }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#f8fafc',
+            color: 'var(--text-primary)',
             cursor: 'pointer'
           }}
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={18} />
         </button>
 
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#f8fafc' }}>
+          <div style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text-primary)' }}>
             {workerData.workerId} &bull; {workerData.shiftId}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
             {workerData.workerName} ({workerData.department})
           </div>
         </div>
@@ -92,9 +94,74 @@ export default function CaptureScreen({ workerData, onBack, onComplete }) {
         <div style={{ width: '38px' }} />
       </div>
 
-      {/* Main Camera Viewfinder Section */}
+      {/* Mode Switcher Tabs: Pic Scan vs Live Stream */}
+      <div
+        style={{
+          display: 'flex',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: '12px',
+          padding: '3px',
+          marginBottom: '10px',
+          gap: '4px'
+        }}
+      >
+        <button
+          onClick={() => setCaptureMode('pic-scan')}
+          disabled={isProcessing}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            borderRadius: '9px',
+            border: 'none',
+            background: captureMode === 'pic-scan' ? 'linear-gradient(135deg, #0284c7, #06b6d4)' : 'transparent',
+            color: captureMode === 'pic-scan' ? '#ffffff' : 'var(--text-secondary)',
+            fontSize: '0.78rem',
+            fontWeight: '800',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Camera size={15} />
+          <span>PIC SCAN (MOBILE)</span>
+        </button>
+
+        <button
+          onClick={() => setCaptureMode('live-camera')}
+          disabled={isProcessing}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            borderRadius: '9px',
+            border: 'none',
+            background: captureMode === 'live-camera' ? 'linear-gradient(135deg, #0284c7, #06b6d4)' : 'transparent',
+            color: captureMode === 'live-camera' ? '#ffffff' : 'var(--text-secondary)',
+            fontSize: '0.78rem',
+            fontWeight: '800',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Video size={15} />
+          <span>LIVE STREAM</span>
+        </button>
+      </div>
+
+      {/* Main Viewfinder Section */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <CameraCapture onCapture={handleCapture} isProcessing={isProcessing} />
+        {captureMode === 'pic-scan' ? (
+          <PicScanCapture onCapture={handleCapture} isProcessing={isProcessing} />
+        ) : (
+          <CameraCapture onCapture={handleCapture} isProcessing={isProcessing} />
+        )}
       </div>
 
       {/* Processing Modal Overlay */}

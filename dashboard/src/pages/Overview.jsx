@@ -113,10 +113,10 @@ export default function Overview({ onSelectWorker }) {
       {/* Top Action Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#f8fafc', letterSpacing: '-0.02em' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
             Occupational Health Overview
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: '4px' }}>
             Real-time passive H₂S dosimeter exposure telemetry across all refinery units & field crews.
           </p>
         </div>
@@ -153,7 +153,7 @@ export default function Overview({ onSelectWorker }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            boxShadow: '0 4px 20px rgba(244, 63, 94, 0.15)'
+            boxShadow: '0 4px 20px rgba(244, 63, 94, 0.12)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -166,16 +166,16 @@ export default function Overview({ onSelectWorker }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#fb7185'
+                color: 'var(--accent-rose)'
               }}
             >
               <ShieldAlert size={22} />
             </div>
             <div>
-              <strong style={{ color: '#fb7185', fontSize: '0.95rem', display: 'block' }}>
+              <strong style={{ color: 'var(--accent-rose)', fontSize: '0.95rem', display: 'block' }}>
                 {overThresholdCount} Worker(s) Exceeded DGMS Permissible 80 ppm·h Threshold
               </strong>
-              <span style={{ color: '#cbd5e1', fontSize: '0.82rem' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
                 Immediate rotation off hot zones and medical health surveillance check required under OISD-STD-114.
               </span>
             </div>
@@ -188,29 +188,29 @@ export default function Overview({ onSelectWorker }) {
         {/* Card 1: Total Workers */}
         <div className="glass-card" style={{ padding: '18px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: '600', textTransform: 'uppercase' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase' }}>
               Monitored Personnel
             </span>
-            <Users size={20} color="#06b6d4" />
+            <Users size={20} color="var(--accent-cyan)" />
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800', color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
             {totalWorkers}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Active registered badges</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Active registered badges</span>
         </div>
 
         {/* Card 2: Over Threshold Alerts */}
         <div className="glass-card" style={{ padding: '18px 20px', border: overThresholdCount > 0 ? '1px solid rgba(244,63,94,0.4)' : '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: '600', textTransform: 'uppercase' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase' }}>
               Over Threshold
             </span>
-            <ShieldAlert size={20} color={overThresholdCount > 0 ? '#f43f5e' : '#64748b'} />
+            <ShieldAlert size={20} color={overThresholdCount > 0 ? 'var(--accent-rose)' : 'var(--text-muted)'} />
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800', color: overThresholdCount > 0 ? '#fb7185' : '#f8fafc', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: '2rem', fontWeight: '800', color: overThresholdCount > 0 ? 'var(--accent-rose)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
             {overThresholdCount}
           </div>
-          <span style={{ fontSize: '0.75rem', color: overThresholdCount > 0 ? '#fb7185' : '#64748b' }}>
+          <span style={{ fontSize: '0.75rem', color: overThresholdCount > 0 ? 'var(--accent-rose)' : 'var(--text-muted)' }}>
             &gt; 80 ppm·h DGMS limit
           </span>
         </div>
@@ -218,36 +218,36 @@ export default function Overview({ onSelectWorker }) {
         {/* Card 3: Approaching Limit */}
         <div className="glass-card" style={{ padding: '18px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: '600', textTransform: 'uppercase' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase' }}>
               Approaching Limit
             </span>
-            <AlertTriangle size={20} color="#f59e0b" />
+            <AlertTriangle size={20} color="var(--accent-amber)" />
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800', color: '#fbbf24', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--accent-amber)', fontFamily: 'var(--font-mono)' }}>
             {approachingCount}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>60 - 80 ppm·h zone</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>60 - 80 ppm·h zone</span>
         </div>
 
         {/* Card 4: Average Exposure */}
         <div className="glass-card" style={{ padding: '18px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: '600', textTransform: 'uppercase' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase' }}>
               Fleet Avg Dose
             </span>
-            <Activity size={20} color="#10b981" />
+            <Activity size={20} color="var(--accent-emerald)" />
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
-            {avgDose} <span style={{ fontSize: '1rem', fontWeight: '500', color: '#94a3b8' }}>ppm·h</span>
+          <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+            {avgDose} <span style={{ fontSize: '1rem', fontWeight: '500', color: 'var(--text-secondary)' }}>ppm·h</span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Mean cumulative exposure</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mean cumulative exposure</span>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
       <div className="glass-card" style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 260px' }}>
-          <Search size={18} color="#94a3b8" />
+          <Search size={18} color="var(--text-muted)" />
           <input
             type="text"
             className="input-control"
@@ -259,8 +259,8 @@ export default function Overview({ onSelectWorker }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Filter size={16} color="#94a3b8" />
-          <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Dept:</span>
+          <Filter size={16} color="var(--text-muted)" />
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Dept:</span>
           <select
             className="input-control"
             value={selectedDept}
@@ -294,17 +294,17 @@ export default function Overview({ onSelectWorker }) {
             padding: '16px'
           }}
         >
-          <div className="glass-card" style={{ width: '100%', maxWidth: '440px', padding: '24px', background: '#0e1422' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#f8fafc', marginBottom: '4px' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '440px', padding: '24px', background: 'var(--bg-card-solid)' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>
               Register New Worker
             </h2>
-            <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginBottom: '18px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
               Add worker metadata for H₂S dosimeter assignment.
             </p>
 
             <form onSubmit={handleCreateWorker} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>
                   Worker ID (e.g. W1026)
                 </label>
                 <input
@@ -319,7 +319,7 @@ export default function Overview({ onSelectWorker }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>
                   Full Name
                 </label>
                 <input
@@ -334,7 +334,7 @@ export default function Overview({ onSelectWorker }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>
                   Department / Operating Unit
                 </label>
                 <input
@@ -349,7 +349,7 @@ export default function Overview({ onSelectWorker }) {
               </div>
 
               {modalError && (
-                <div style={{ color: '#fb7185', fontSize: '0.8rem', background: 'rgba(244,63,94,0.1)', padding: '8px 12px', borderRadius: '6px' }}>
+                <div style={{ color: 'var(--accent-rose)', fontSize: '0.8rem', background: 'rgba(244,63,94,0.1)', padding: '8px 12px', borderRadius: '6px' }}>
                   {modalError}
                 </div>
               )}

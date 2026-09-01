@@ -100,21 +100,21 @@ export default function ExposureChart({ readings = [], threshold = 80 }) {
       {/* Chart Header & Mode Switcher */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
-          <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#f8fafc' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>
             {chartType === 'cumulative' ? 'Cumulative Exposure Progression' : 'Shift-by-Shift Dosimetry'}
           </h3>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
             DGMS Occupational Limit: {threshold} ppm·hours
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', background: 'rgba(15, 23, 42, 0.7)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+        <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-table-header)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
           <button
             onClick={() => setChartType('cumulative')}
             style={{
               background: chartType === 'cumulative' ? 'rgba(6, 182, 212, 0.25)' : 'transparent',
               border: chartType === 'cumulative' ? '1px solid rgba(6, 182, 212, 0.5)' : 'none',
-              color: chartType === 'cumulative' ? '#38bdf8' : '#94a3b8',
+              color: chartType === 'cumulative' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
               borderRadius: '6px',
               padding: '5px 10px',
               fontSize: '0.75rem',
@@ -134,7 +134,7 @@ export default function ExposureChart({ readings = [], threshold = 80 }) {
             style={{
               background: chartType === 'bar' ? 'rgba(6, 182, 212, 0.25)' : 'transparent',
               border: chartType === 'bar' ? '1px solid rgba(6, 182, 212, 0.5)' : 'none',
-              color: chartType === 'bar' ? '#38bdf8' : '#94a3b8',
+              color: chartType === 'bar' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
               borderRadius: '6px',
               padding: '5px 10px',
               fontSize: '0.75rem',
@@ -162,9 +162,9 @@ export default function ExposureChart({ readings = [], threshold = 80 }) {
                   <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
-              <YAxis stroke="#64748b" tick={{ fontSize: 11 }} domain={[0, 'auto']} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+              <XAxis dataKey="name" stroke="var(--text-muted)" tick={{ fontSize: 11 }} />
+              <YAxis stroke="var(--text-muted)" tick={{ fontSize: 11 }} domain={[0, 'auto']} />
               <Tooltip content={<CustomTooltip />} />
               <ReferenceLine
                 y={threshold}
@@ -184,9 +184,9 @@ export default function ExposureChart({ readings = [], threshold = 80 }) {
             </AreaChart>
           ) : (
             <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
-              <YAxis stroke="#64748b" tick={{ fontSize: 11 }} domain={[0, 'auto']} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+              <XAxis dataKey="name" stroke="var(--text-muted)" tick={{ fontSize: 11 }} />
+              <YAxis stroke="var(--text-muted)" tick={{ fontSize: 11 }} domain={[0, 'auto']} />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="shiftDose" fill="#0284c7" radius={[6, 6, 0, 0]} />
             </BarChart>

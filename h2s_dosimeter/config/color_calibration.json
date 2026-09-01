@@ -1,0 +1,42 @@
+{
+  "camera_model": "Generic-sRGB-Fallback",
+  "is_fallback": true,
+  "calibration_date": "2026-01-01",
+  "notes": "Standard ITU-R BT.709 sRGB matrix (D65). FALLBACK ONLY — calibrate camera CCM for production.",
+  "ccm_matrix": [
+    [0.4124564, 0.3575761, 0.1804375],
+    [0.2126729, 0.7151522, 0.0721750],
+    [0.0193339, 0.1191920, 0.9503041]
+  ],
+  "reference_white": [0.95047, 1.0, 1.08883],
+  "reference_baseline_lab": [95.4, -0.4, 4.2],
+  "white_reference_roi": {
+    "name": "White_Reference_Patch",
+    "x_min": 0.05,
+    "y_min": 0.20,
+    "x_max": 0.45,
+    "y_max": 0.80,
+    "is_normalized": true
+  },
+  "h2s_strip_roi": {
+    "name": "H2S_Active_Strip",
+    "x_min": 0.55,
+    "y_min": 0.20,
+    "x_max": 0.95,
+    "y_max": 0.80,
+    "is_normalized": true
+  },
+  "optical_thresholds": {
+    "saturation_threshold_8bit": 250,
+    "underexposed_threshold_8bit": 15,
+    "min_valid_pixels": 40,
+    "min_valid_ratio": 0.35,
+    "min_confidence_score": 50.0
+  },
+  "environmental_coefficients": {
+    "temperature_alpha_per_deg_c": 0.005,
+    "humidity_beta_per_pct_rh": 0.0025,
+    "reference_temp_c": 25.0,
+    "reference_humidity_rh": 50.0
+  }
+}

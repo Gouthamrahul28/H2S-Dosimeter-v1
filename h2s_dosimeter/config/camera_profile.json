@@ -1,0 +1,44 @@
+{
+  "default_profile": "camera_default_fallback",
+  "profiles": {
+    "camera_default_fallback": {
+      "camera_id": "camera_default_fallback",
+      "description": "Standard sRGB D65 identity camera matrix (Fallback / Uncharacterized)",
+      "is_characterized": false,
+      "reference_illuminant": "D65",
+      "white_point": [0.95047, 1.00000, 1.08883],
+      "ccm": [
+        [0.4124564, 0.3575761, 0.1804375],
+        [0.2126729, 0.7151522, 0.0721750],
+        [0.0193339, 0.1191920, 0.9503041]
+      ],
+      "avg_validation_delta_e00": 3.85
+    },
+    "camera_enclosure_v1": {
+      "camera_id": "camera_enclosure_v1",
+      "description": "Optical enclosure camera characterized under 5000K diffuse LED illumination (ISO 17321-1)",
+      "is_characterized": true,
+      "reference_illuminant": "D50",
+      "white_point": [0.96422, 1.00000, 0.82521],
+      "ccm": [
+        [0.4360747, 0.3850649, 0.1430804],
+        [0.2225045, 0.7168786, 0.0606169],
+        [0.0139322, 0.0971045, 0.7141029]
+      ],
+      "avg_validation_delta_e00": 0.92
+    },
+    "phone_sensor_sony_imx": {
+      "camera_id": "phone_sensor_sony_imx",
+      "description": "Smartphone CMOS sensor characterized against 24-patch standard chart",
+      "is_characterized": true,
+      "reference_illuminant": "D65",
+      "white_point": [0.95047, 1.00000, 1.08883],
+      "ccm": [
+        [0.441203, 0.338910, 0.170357],
+        [0.208740, 0.725410, 0.065850],
+        [0.018210, 0.112430, 0.958190]
+      ],
+      "avg_validation_delta_e00": 1.15
+    }
+  }
+}

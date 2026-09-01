@@ -91,12 +91,12 @@ export default function WorkerTable({ workers = [], onSelectWorker }) {
                           width: '32px',
                           height: '32px',
                           borderRadius: '8px',
-                          background: isOver ? 'rgba(244, 63, 94, 0.2)' : 'rgba(6, 182, 212, 0.15)',
-                          border: isOver ? '1px solid rgba(244, 63, 94, 0.4)' : '1px solid rgba(6, 182, 212, 0.3)',
+                          background: isOver ? 'rgba(244, 63, 94, 0.15)' : 'rgba(6, 182, 212, 0.12)',
+                          border: isOver ? '1px solid rgba(244, 63, 94, 0.35)' : '1px solid rgba(6, 182, 212, 0.3)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: isOver ? '#fb7185' : '#38bdf8',
+                          color: isOver ? 'var(--accent-rose)' : 'var(--accent-cyan)',
                           fontWeight: '700',
                           fontSize: '0.8rem',
                           fontFamily: 'var(--font-mono)'
@@ -104,7 +104,7 @@ export default function WorkerTable({ workers = [], onSelectWorker }) {
                       >
                         {w.workerId.slice(0, 3)}
                       </div>
-                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.92rem', color: '#f8fafc' }}>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.92rem', color: 'var(--text-primary)' }}>
                         {w.workerId}
                       </strong>
                     </div>
@@ -112,12 +112,12 @@ export default function WorkerTable({ workers = [], onSelectWorker }) {
 
                   {/* Name */}
                   <td>
-                    <div style={{ fontWeight: '600', color: '#f1f5f9' }}>{w.name}</div>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{w.name}</div>
                   </td>
 
                   {/* Department */}
                   <td>
-                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{w.department}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{w.department}</span>
                   </td>
 
                   {/* Reading Count */}
@@ -126,11 +126,12 @@ export default function WorkerTable({ workers = [], onSelectWorker }) {
                       style={{
                         display: 'inline-block',
                         padding: '3px 10px',
-                        background: 'rgba(255, 255, 255, 0.05)',
+                        background: 'var(--bg-table-header)',
+                        border: '1px solid var(--border-subtle)',
                         borderRadius: '6px',
                         fontSize: '0.8rem',
                         fontWeight: '600',
-                        color: '#cbd5e1',
+                        color: 'var(--text-secondary)',
                         fontFamily: 'var(--font-mono)'
                       }}
                     >
@@ -146,14 +147,14 @@ export default function WorkerTable({ workers = [], onSelectWorker }) {
                           fontWeight: '800',
                           fontSize: '1rem',
                           fontFamily: 'var(--font-mono)',
-                          color: isOver ? '#fb7185' : percent >= 75 ? '#fbbf24' : '#38bdf8'
+                          color: isOver ? 'var(--accent-rose)' : percent >= 75 ? 'var(--accent-amber)' : 'var(--accent-cyan)'
                         }}
                       >
-                        {(w.totalDosePpmHours || 0).toFixed(1)} <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#94a3b8' }}>ppm·h</span>
+                        {(w.totalDosePpmHours || 0).toFixed(1)} <span style={{ fontSize: '0.75rem', fontWeight: '500', color: 'var(--text-secondary)' }}>ppm·h</span>
                       </span>
 
                       {/* Mini Progress Bar */}
-                      <div style={{ width: '90px', height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: '90px', height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
                         <div
                           style={{
                             height: '100%',

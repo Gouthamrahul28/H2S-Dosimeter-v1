@@ -1,0 +1,23 @@
+{
+  "trainedAt": "2026-09-01T05:51:02.963Z",
+  "datasetFile": "D:\\H2S DOSIMETER\\training\\dataset.csv",
+  "sampleCount": 25,
+  "bestModelType": "linear",
+  "metrics": {
+    "mae": 3.058692919107468,
+    "rmse": 4.734462862018647,
+    "r2": 0.9903078489240011,
+    "maxErr": 20.602133646380537
+  },
+  "models": {
+    "custom-trained-model": {
+      "name": "Custom Lab Calibrated Model (linear)",
+      "description": "Auto-fitted on 25 experimental strip captures. R² = 0.9903",
+      "targetRange": "0.0 - 250.0 ppm·hours",
+      "type": "linear",
+      "slope": 0.3972826682674835,
+      "tempCoeff": 0.004,
+      "humCoeff": 0.002
+    }
+  }
+}

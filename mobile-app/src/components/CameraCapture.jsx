@@ -1,77 +1,103 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, SwitchCamera, Zap, Image as ImageIcon, RefreshCw, AlertCircle, Sliders } from 'lucide-react';
+import {
+  Camera,
+  SwitchCamera,
+  Zap,
+  Image as ImageIcon,
+  RefreshCw,
+  AlertTriangle,
+  Sliders,
+  CheckCircle2,
+  XCircle,
+  Activity,
+  ShieldAlert,
+  ChevronDown,
+  ChevronUp,
+  Cpu
+} from 'lucide-react';
 import ReferencePatchOverlay from './ReferencePatchOverlay';
+import {
+  startCameraStream,
+  stopCameraStream,
+  captureFrameFromVideo,
+  normalizeImageFile,
+  checkCameraSupport
+} from '../services/cameraService';
+import { runMobileDiagnostics } from '../services/mobileDiagnostics';
 
-/**
- * CameraCapture
- * 
- * Reusable viewfinder component supporting getUserMedia, frame grab,
- * fallback synthetic sample generation, and ambient sensor controls.
- */
 export default function CameraCapture({ onCapture, isProcessing }) {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [stream, setStream] = useState(null);
-  const [cameraFacing, setCameraFacing] = useState('environment'); // 'environment' or 'user'
+  const [cameraFacing, setCameraFacing] = useState('environment'); // 'environment' | 'user'
   const [cameraError, setCameraError] = useState(null);
-  const [flashOn, setFlashOn] = useState(false);
   const [hasFlashSupport, setHasFlashSupport] = useState(false);
-  const [ambientTemp, setAmbientTemp] = useState(32.5);
-  const [ambientHumidity, setAmbientHumidity] = useState(61);
+  const [flashOn, setFlashOn] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  // Environmental inputs (Arrhenius kinetic compensation)
+  const [ambientTemp, setAmbientTemp] = useState(25.0);
+  const [ambientHumidity, setAmbientHumidity] = useState(50.0);
   const [showSensorSettings, setShowSensorSettings] = useState(false);
 
+  // Live Mobile Diagnostics Overlay State
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnosticsData, setDiagnosticsData] = useState(null);
+
+  const supportCheck = checkCameraSupport();
+
   // Initialize camera stream
-  useEffect(() => {
-    let currentStream = null;
+  const initCamera = async () => {
+    setCameraError(null);
+    setIsInitializing(true);
 
-    async function initCamera() {
-      setCameraError(null);
-      try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('Camera API (getUserMedia) not supported in this browser');
-        }
-
-        if (stream) {
-          stream.getTracks().forEach((t) => t.stop());
-        }
-
-        const constraints = {
-          video: {
-            facingMode: { ideal: cameraFacing },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        };
-
-        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-        currentStream = mediaStream;
-        setStream(mediaStream);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-        }
-
-        // Check torch support
-        const track = mediaStream.getVideoTracks()[0];
-        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-        setHasFlashSupport(!!capabilities.torch);
-      } catch (err) {
-        console.warn('[CameraCapture] Camera initialization error:', err.message);
-        setCameraError(err.message || 'Camera permission denied or camera unavailable');
+    try {
+      if (stream) {
+        stopCameraStream(stream);
       }
+
+      const mediaStream = await startCameraStream(cameraFacing);
+      setStream(mediaStream);
+
+      // Check torch capability
+      const track = mediaStream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+      setHasFlashSupport(!!capabilities.torch);
+    } catch (err) {
+      console.warn('[CameraCapture] Camera initialization error:', err.message);
+      setCameraError(err.message || 'Camera access error');
+    } finally {
+      setIsInitializing(false);
     }
+  };
 
+  useEffect(() => {
     initCamera();
-
     return () => {
-      if (currentStream) {
-        currentStream.getTracks().forEach((t) => t.stop());
+      if (stream) {
+        stopCameraStream(stream);
       }
     };
   }, [cameraFacing]);
+
+  // Attach stream to videoRef and play explicitly (Safari iOS compatibility)
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch((playErr) => {
+        console.warn('[CameraCapture] Autoplay prevented on iOS/Android, user interaction needed:', playErr);
+      });
+    }
+  }, [stream]);
+
+  // Flip camera (Rear <-> Front)
+  const switchCamera = () => {
+    if (stream) {
+      stopCameraStream(stream);
+    }
+    setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'));
+  };
 
   // Toggle flash/torch
   const toggleFlash = async () => {
@@ -83,375 +109,464 @@ export default function CameraCapture({ onCapture, isProcessing }) {
         });
         setFlashOn(!flashOn);
       } catch (e) {
-        console.warn('Torch toggle failed:', e);
+        console.warn('[CameraCapture] Torch toggle error:', e);
       }
     }
   };
 
-  // Toggle front/rear camera
-  const switchCamera = () => {
-    setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'));
-  };
+  // Capture Frame from Live Video Stream
+  const handleCapture = () => {
+    if (isProcessing) return;
 
-  // Capture image from video stream
-  const captureFrame = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
+    const startTime = performance.now();
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
 
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (!video || !stream) {
+      fileInputRef.current?.click();
+      return;
+    }
 
-    const imageBase64 = canvas.toDataURL('image/jpeg', 0.92);
-    onCapture({
-      imageBase64,
-      ambientTemp,
-      ambientHumidity
-    });
+    try {
+      const frameData = captureFrameFromVideo(video);
+      const diag = runMobileDiagnostics({
+        videoElement: video,
+        imageData: frameData.imageData,
+        orientation: frameData.orientation,
+        startTimeMs: startTime
+      });
+      setDiagnosticsData(diag);
+
+      onCapture({
+        imageBase64: frameData.imageBase64,
+        ambientTemp,
+        ambientHumidity,
+        diagnostics: diag
+      });
+    } catch (err) {
+      console.error('[CameraCapture] Frame capture error:', err.message);
+      setCameraError(`Capture error: ${err.message}`);
+    }
   };
 
-  // Handle local file upload fallback
-  const handleFileUpload = (e) => {
+  // Handle uploaded photo / native camera capture
+  const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const imageBase64 = uploadEvent.target?.result;
-      if (imageBase64) {
-        onCapture({
-          imageBase64,
-          ambientTemp,
-          ambientHumidity
-        });
-      }
-    };
-    reader.readAsDataURL(file);
-  };
+    const startTime = performance.now();
+    try {
+      const frameData = await normalizeImageFile(file);
+      const diag = runMobileDiagnostics({
+        videoElement: null,
+        imageData: frameData.imageData,
+        orientation: frameData.orientation,
+        startTimeMs: startTime
+      });
+      setDiagnosticsData(diag);
 
-  // Generate synthetic dosimeter test frame (for rapid field testing without physical wristband)
-  const generateSimulatedCapture = (exposureLevel = 'moderate') => {
-    const canvas = canvasRef.current || document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 480;
-    const ctx = canvas.getContext('2d');
-
-    // Background wristband
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, 640, 480);
-    ctx.fillStyle = '#334155';
-    ctx.roundRect(30, 30, 580, 420, 20);
-    ctx.fill();
-
-    // Top-Left: Reference patch (white standard)
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(64, 48, 128, 96);
-    ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillText('REF (WHITE)', 90, 100);
-
-    // Top-Right: Expiry patch (shelf indicator)
-    ctx.fillStyle = exposureLevel === 'expired' ? '#64748b' : '#e2e8f0';
-    ctx.fillRect(448, 48, 128, 96);
-    ctx.fillStyle = '#334155';
-    ctx.fillText('EXPIRY', 485, 100);
-
-    // Center: Active H2S Strip
-    let stripColor = '#8b5cf6'; // moderate purple/dark
-    if (exposureLevel === 'high') stripColor = '#3b0764'; // dark exposed
-    if (exposureLevel === 'low') stripColor = '#c4b5fd';  // light violet
-
-    ctx.fillStyle = stripColor;
-    ctx.fillRect(243, 182, 154, 115);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('H2S STRIP', 290, 245);
-
-    const imageBase64 = canvas.toDataURL('image/jpeg', 0.92);
-    onCapture({
-      imageBase64,
-      ambientTemp,
-      ambientHumidity
-    });
+      onCapture({
+        imageBase64: frameData.imageBase64,
+        ambientTemp,
+        ambientHumidity,
+        diagnostics: diag
+      });
+    } catch (err) {
+      console.error('[CameraCapture] File normalization error:', err.message);
+      setCameraError(`Photo processing error: ${err.message}`);
+    }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      {/* Hidden canvas for image capture */}
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      {/* Native file input for fallback mobile photo capture */}
       <input
         type="file"
         ref={fileInputRef}
         accept="image/*"
+        capture="environment"
         style={{ display: 'none' }}
         onChange={handleFileUpload}
       />
 
-      {/* Main Viewfinder Container */}
+      {/* Main Viewfinder Window */}
       <div
         style={{
+          flex: 1,
           position: 'relative',
-          width: '100%',
-          aspectRatio: '3/4',
-          maxHeight: '52vh',
           background: '#030712',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
-          border: '1px solid var(--border-subtle)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '280px',
+          border: '1px solid var(--border-subtle)'
         }}
       >
-        {/* Live Video Preview */}
-        {!cameraError ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover'
-            }}
-          />
-        ) : (
+        {/* Insecure Origin Warning Banner */}
+        {!supportCheck.isSecure && (
           <div
             style={{
-              width: '100%',
-              height: '100%',
+              position: 'absolute',
+              top: '12px',
+              left: '12px',
+              right: '12px',
+              background: 'rgba(239, 68, 68, 0.92)',
+              color: '#ffffff',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              zIndex: 30,
+              fontSize: '0.78rem',
               display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '24px',
-              textAlign: 'center',
-              background: 'rgba(15, 23, 42, 0.9)'
+              alignItems: 'flex-start',
+              gap: '8px',
+              backdropFilter: 'blur(8px)'
             }}
           >
-            <AlertCircle size={44} color="#f59e0b" style={{ marginBottom: '12px' }} />
-            <h4 style={{ color: '#f8fafc', fontSize: '1rem', marginBottom: '6px' }}>Camera Preview Unavailable</h4>
-            <p style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '18px', maxWidth: '280px' }}>
-              {cameraError}
-            </p>
-            <button
-              className="btn-secondary"
-              onClick={() => fileInputRef.current?.click()}
-              style={{ fontSize: '0.85rem', padding: '8px 16px', minHeight: '40px' }}
-            >
-              <ImageIcon size={16} /> Choose Photo from Gallery
-            </button>
+            <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>Camera Access Requires HTTPS</strong>
+              <div style={{ marginTop: '2px', opacity: 0.9 }}>
+                Mobile browsers block live camera on insecure HTTP LAN IPs. Please use localhost, HTTPS tunneling, or tap <strong>Upload Photo / Native Camera</strong> below.
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Reticle Overlay Guide */}
-        <ReferencePatchOverlay />
+        {/* Live Video Element with explicit iOS Safari attributes */}
+        <video
+          ref={videoRef}
+          id="camera"
+          autoPlay
+          playsInline
+          webkit-playsinline="true"
+          muted
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: stream && !cameraError ? 'block' : 'none'
+          }}
+        />
 
-        {/* Viewfinder Top Controls Overlay */}
+        {/* 3-Patch Optical Alignment Reticle */}
+        {stream && !cameraError && <ReferencePatchOverlay />}
+
+        {/* Camera Inactive / Error Placeholder */}
+        {(!stream || cameraError) && (
+          <div
+            style={{
+              padding: '24px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '14px',
+              zIndex: 10
+            }}
+          >
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'rgba(244, 63, 94, 0.15)',
+                border: '1px solid rgba(244, 63, 94, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#f43f5e'
+              }}
+            >
+              <Camera size={30} />
+            </div>
+
+            <div>
+              <h4 style={{ color: '#f8fafc', fontSize: '1rem', fontWeight: '700', marginBottom: '6px' }}>
+                {cameraError ? 'Camera Access Required' : 'Live Camera Standby'}
+              </h4>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', maxWidth: '280px', margin: '0 auto', lineHeight: '1.4' }}>
+                {cameraError || 'Press START CAMERA to initialize live video or select a photo from your gallery.'}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                className="btn-primary"
+                onClick={initCamera}
+                disabled={isInitializing}
+                style={{ padding: '10px 18px', fontSize: '0.82rem' }}
+              >
+                {isInitializing ? <RefreshCw size={16} className="animate-spin" /> : <Camera size={16} />}
+                Start Camera
+              </button>
+
+              <button
+                className="btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ padding: '10px 18px', fontSize: '0.82rem' }}
+              >
+                <ImageIcon size={16} /> Use Native Camera / File
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Top Viewfinder Control Badges */}
         <div
           style={{
             position: 'absolute',
             top: '12px',
-            left: '12px',
             right: '12px',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            zIndex: 10
+            gap: '8px',
+            zIndex: 20
           }}
         >
-          <button
-            onClick={() => setShowSensorSettings(!showSensorSettings)}
-            style={{
-              background: showSensorSettings ? 'var(--accent-cyan)' : 'rgba(15, 23, 42, 0.75)',
-              color: showSensorSettings ? '#0f172a' : '#f8fafc',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: 'var(--radius-full)',
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              backdropFilter: 'blur(8px)'
-            }}
-          >
-            <Sliders size={14} />
-            <span>{ambientTemp}°C | {ambientHumidity}% RH</span>
-          </button>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {hasFlashSupport && (
-              <button
-                onClick={toggleFlash}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: flashOn ? '#eab308' : 'rgba(15, 23, 42, 0.75)',
-                  color: flashOn ? '#0f172a' : '#f8fafc',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  backdropFilter: 'blur(8px)'
-                }}
-              >
-                <Zap size={16} />
-              </button>
-            )}
-
+          {hasFlashSupport && (
             <button
-              onClick={switchCamera}
+              onClick={toggleFlash}
               style={{
                 width: '36px',
                 height: '36px',
                 borderRadius: '50%',
-                background: 'rgba(15, 23, 42, 0.75)',
-                color: '#f8fafc',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
+                background: flashOn ? 'rgba(234, 179, 8, 0.85)' : 'rgba(15, 23, 42, 0.75)',
+                color: flashOn ? '#000' : '#f8fafc',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
                 backdropFilter: 'blur(8px)'
               }}
-              title="Flip camera"
+              title="Toggle Torch"
             >
-              <SwitchCamera size={16} />
+              <Zap size={16} />
             </button>
-          </div>
-        </div>
-      </div>
+          )}
 
-      {/* Sensor Adjusters Drawer */}
-      {showSensorSettings && (
-        <div className="glass-panel" style={{ marginTop: '10px', padding: '14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ambient Temperature:</span>
-            <strong style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)' }}>{ambientTemp} °C</strong>
-          </div>
-          <input
-            type="range"
-            min="10"
-            max="50"
-            step="0.5"
-            value={ambientTemp}
-            onChange={(e) => setAmbientTemp(parseFloat(e.target.value))}
-            style={{ width: '100%', accentColor: '#06b6d4', marginBottom: '12px' }}
-          />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Relative Humidity:</span>
-            <strong style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)' }}>{ambientHumidity} %</strong>
-          </div>
-          <input
-            type="range"
-            min="10"
-            max="100"
-            step="1"
-            value={ambientHumidity}
-            onChange={(e) => setAmbientHumidity(parseInt(e.target.value))}
-            style={{ width: '100%', accentColor: '#06b6d4' }}
-          />
-        </div>
-      )}
-
-      {/* Bottom Shutter Action Bar */}
-      <div
-        style={{
-          marginTop: 'auto',
-          padding: '16px 0 8px 0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          {/* Gallery Upload Button */}
           <button
-            className="btn-secondary"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isProcessing}
-            style={{ flex: 1, padding: '12px', fontSize: '0.85rem' }}
-            title="Upload from gallery"
-          >
-            <ImageIcon size={18} /> Gallery
-          </button>
-
-          {/* Main Shutter Button */}
-          <button
-            onClick={captureFrame}
-            disabled={isProcessing}
+            onClick={switchCamera}
             style={{
-              width: '74px',
-              height: '74px',
+              width: '36px',
+              height: '36px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)',
-              border: '4px solid #ffffff',
-              boxShadow: '0 0 24px rgba(6, 182, 212, 0.6)',
+              background: 'rgba(15, 23, 42, 0.75)',
+              color: '#f8fafc',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
-              cursor: isProcessing ? 'not-allowed' : 'pointer',
-              transition: 'transform 0.15s ease',
-              transform: isProcessing ? 'scale(0.95)' : 'scale(1)'
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)'
+            }}
+            title="Switch Camera"
+          >
+            <SwitchCamera size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Diagnostics HUD Toggle */}
+      <div style={{ marginTop: '8px' }}>
+        <button
+          onClick={() => setShowDiagnostics(!showDiagnostics)}
+          style={{
+            width: '100%',
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: '8px',
+            padding: '8px 12px',
+            color: 'var(--text-secondary)',
+            fontSize: '0.72rem',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Activity size={14} color="#06b6d4" />
+            <span>MOBILE DIAGNOSTICS PANEL</span>
+          </div>
+          {showDiagnostics ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+
+        {showDiagnostics && (
+          <div
+            style={{
+              marginTop: '6px',
+              background: 'rgba(3, 7, 18, 0.95)',
+              border: '1px solid rgba(6, 182, 212, 0.3)',
+              borderRadius: '8px',
+              padding: '12px',
+              fontSize: '0.72rem',
+              fontFamily: 'monospace',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
             }}
           >
-            {isProcessing ? (
-              <RefreshCw size={28} className="animate-spin" />
-            ) : (
-              <Camera size={32} />
+            <strong style={{ color: '#38bdf8', marginBottom: '2px', display: 'block' }}>
+              MOBILE DIAGNOSTICS & TELEMETRY
+            </strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Camera Stream:</span>
+              <strong style={{ color: stream ? '#10b981' : '#f43f5e' }}>{stream ? 'PASS' : 'INACTIVE'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Secure Context:</span>
+              <strong style={{ color: supportCheck.isSecure ? '#10b981' : '#f43f5e' }}>{supportCheck.isSecure ? 'PASS (HTTPS)' : 'FAIL (HTTP)'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Video Dimensions:</span>
+              <span>{videoRef.current?.videoWidth ? `${videoRef.current.videoWidth} × ${videoRef.current.videoHeight}` : 'STANDBY'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Pixel Extraction:</span>
+              <strong style={{ color: diagnosticsData?.overallPassed ? '#10b981' : '#94a3b8' }}>
+                {diagnosticsData?.overallPassed ? 'PASS' : 'READY TO CAPTURE'}
+              </strong>
+            </div>
+
+            {diagnosticsData?.steps && (
+              <div style={{ marginTop: '6px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {diagnosticsData.steps.map((step, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: step.status === 'PASS' ? '#10b981' : step.status === 'FAIL' ? '#f43f5e' : '#f59e0b' }}>
+                    <span>{step.name}:</span>
+                    <span>{step.status} ({step.details})</span>
+                  </div>
+                ))}
+              </div>
             )}
-          </button>
+          </div>
+        )}
+      </div>
 
-          {/* Test Pattern Simulator */}
-          <button
-            className="btn-secondary"
-            onClick={() => generateSimulatedCapture('moderate')}
-            disabled={isProcessing}
-            style={{ flex: 1, padding: '12px', fontSize: '0.85rem' }}
-            title="Generate test frame"
-          >
-            🧪 Test Frame
-          </button>
-        </div>
+      {/* Environmental Adjuster Drawer Toggle */}
+      <div style={{ marginTop: '6px' }}>
+        <button
+          onClick={() => setShowSensorSettings(!showSensorSettings)}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-muted)',
+            fontSize: '0.72rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            padding: '4px'
+          }}
+        >
+          <Sliders size={12} />
+          <span>{showSensorSettings ? 'Hide Ambient Calibration' : 'Adjust Ambient Temp & Humidity'}</span>
+        </button>
 
-        {/* Quick Simulated Exposure Presets (Helpful for quick demonstration) */}
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-          <button
-            onClick={() => generateSimulatedCapture('low')}
-            style={{
-              background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              color: '#34d399',
-              borderRadius: '6px',
-              padding: '4px 8px',
-              fontSize: '0.72rem',
-              cursor: 'pointer'
-            }}
-          >
-            Simulate Safe Dose
-          </button>
-          <button
-            onClick={() => generateSimulatedCapture('high')}
-            style={{
-              background: 'rgba(244, 63, 94, 0.12)',
-              border: '1px solid rgba(244, 63, 94, 0.3)',
-              color: '#fb7185',
-              borderRadius: '6px',
-              padding: '4px 8px',
-              fontSize: '0.72rem',
-              cursor: 'pointer'
-            }}
-          >
-            Simulate Over-Threshold
-          </button>
-        </div>
+        {showSensorSettings && (
+          <div className="glass-panel" style={{ marginTop: '6px', padding: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+              <span>Ambient Temp:</span>
+              <strong style={{ color: 'var(--accent-cyan)' }}>{ambientTemp} °C</strong>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="50"
+              step="0.5"
+              value={ambientTemp}
+              onChange={(e) => setAmbientTemp(parseFloat(e.target.value))}
+              style={{ width: '100%', accentColor: '#06b6d4', marginBottom: '10px' }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+              <span>Relative Humidity:</span>
+              <strong style={{ color: 'var(--accent-cyan)' }}>{ambientHumidity} % RH</strong>
+            </div>
+            <input
+              type="range"
+              min="15"
+              max="90"
+              step="1"
+              value={ambientHumidity}
+              onChange={(e) => setAmbientHumidity(parseInt(e.target.value))}
+              style={{ width: '100%', accentColor: '#06b6d4' }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Tactile Capture Shutter Bar */}
+      <div
+        style={{
+          marginTop: 'auto',
+          paddingTop: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}
+      >
+        {/* Upload / Gallery Button */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isProcessing}
+          style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            color: 'var(--text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer'
+          }}
+          title="Upload image / native camera"
+        >
+          <ImageIcon size={20} />
+        </button>
+
+        {/* Big Shutter Button */}
+        <button
+          onClick={handleCapture}
+          disabled={isProcessing}
+          style={{
+            flex: 1,
+            height: '56px',
+            borderRadius: '999px',
+            background: isProcessing
+              ? 'rgba(6, 182, 212, 0.4)'
+              : 'linear-gradient(135deg, #0284c7, #06b6d4)',
+            color: '#ffffff',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            fontSize: '0.95rem',
+            fontWeight: '800',
+            letterSpacing: '0.04em',
+            boxShadow: '0 4px 20px rgba(6, 182, 212, 0.4)',
+            cursor: isProcessing ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {isProcessing ? (
+            <>
+              <RefreshCw size={20} className="animate-spin" />
+              <span>ANALYZING STRIP...</span>
+            </>
+          ) : (
+            <>
+              <Camera size={22} />
+              <span>CAPTURE STRIP</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

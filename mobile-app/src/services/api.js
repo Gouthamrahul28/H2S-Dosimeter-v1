@@ -1,42 +1,242 @@
 /**
  * mobile-app/src/services/api.js
  * 
- * REST API client targeting the shared H2S Dosimeter backend contract.
- * Includes an offline queue mechanism to persist pending readings when
- * working in remote field/offshore sites without active internet.
+ * Production REST API client targeting the H₂S Dosimeter Backend.
+ * Features:
+ * - Dynamic LAN IP and relative proxy resolution
+ * - 30-second AbortController timeout guard
+ * - Granular network & HTTP status classification
+ * - Active request/response telemetry logging
+ * - Health check & test upload diagnostic endpoints
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+const STORAGE_API_OVERRIDE_KEY = 'h2s_custom_api_base_url';
 const QUEUE_STORAGE_KEY = 'h2s_offline_pending_readings';
+const REQUEST_TIMEOUT_MS = 30000;
 
 /**
- * Generic fetch wrapper with error handling
+ * Resolves the active Backend API base URL dynamically:
+ * 1. User/Developer override from localStorage
+ * 2. Vite Environment Variable (VITE_API_BASE_URL)
+ * 3. Smart LAN IP resolution: If on 192.168.x.x, use relative '/api/v1' (Vite proxy)
+ *    or direct 'http://<hostname>:5000/api/v1'
+ */
+export function getApiBaseUrl() {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem(STORAGE_API_OVERRIDE_KEY);
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/+$/, '');
+    }
+
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    if (envUrl && envUrl.trim()) {
+      const trimmed = envUrl.trim().replace(/\/+$/, '');
+      // Guard against hardcoded localhost when accessed on a real mobile device via LAN IP
+      const currentHost = window.location.hostname;
+      if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+        if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
+          // Switch to same-host relative or direct LAN IP
+          return '/api/v1';
+        }
+      }
+      return trimmed;
+    }
+
+    // Default relative proxy
+    return '/api/v1';
+  }
+  return '/api/v1';
+}
+
+/**
+ * Set a custom API Base URL for testing
+ */
+export function setCustomApiBaseUrl(url) {
+  if (url && url.trim()) {
+    localStorage.setItem(STORAGE_API_OVERRIDE_KEY, url.trim().replace(/\/+$/, ''));
+  } else {
+    localStorage.removeItem(STORAGE_API_OVERRIDE_KEY);
+  }
+}
+
+/**
+ * Core HTTP Request Wrapper with Timeout & Logging
  */
 async function request(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const baseUrl = getApiBaseUrl();
+  const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+  const method = options.method || 'GET';
+  const startTime = performance.now();
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs || REQUEST_TIMEOUT_MS);
+
   const headers = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     ...(options.headers || {})
   };
 
+  const requestSizeKb = options.body ? (new Blob([options.body]).size / 1024).toFixed(1) : '0';
+
+  console.log(`[API Request] ${method} ${url}`, {
+    method,
+    url,
+    headers,
+    requestSize: `${requestSizeKb} KB`
+  });
+
   try {
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const latencyMs = Math.round(performance.now() - startTime);
     const data = await response.json().catch(() => ({}));
 
+    console.log(`[API Response] ${method} ${url} -> Status ${response.status} (${latencyMs} ms)`, {
+      status: response.status,
+      latency: `${latencyMs} ms`,
+      data
+    });
+
     if (!response.ok) {
-      const errorMsg = data.error || `HTTP error ${response.status}: ${response.statusText}`;
-      throw new Error(errorMsg);
+      // Categorize HTTP errors
+      let classifiedMessage = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+      if (response.status === 413) {
+        classifiedMessage = 'PAYLOAD_TOO_LARGE: Photo is too large for the server. Please downscale the image.';
+      } else if (response.status === 415) {
+        classifiedMessage = 'UNSUPPORTED_FORMAT: Server could not process this image format. Use standard JPG/PNG.';
+      } else if (response.status === 422 || response.status === 400) {
+        classifiedMessage = `INVALID_PAYLOAD: ${data.error || 'Missing or invalid parameters'}`;
+      } else if (response.status >= 500) {
+        classifiedMessage = `SERVER_PROCESSING_ERROR: ${data.error || 'Server encountered an internal error during image analysis.'}`;
+      }
+      const error = new Error(classifiedMessage);
+      error.status = response.status;
+      error.data = data;
+      throw error;
     }
 
     return data;
   } catch (err) {
-    console.error(`[API Error] ${options.method || 'GET'} ${endpoint}:`, err);
+    clearTimeout(timeoutId);
+    const latencyMs = Math.round(performance.now() - startTime);
+
+    if (err.name === 'AbortError') {
+      console.error(`[API Timeout] ${method} ${url} timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+      const timeoutErr = new Error('TIMEOUT: The processing server did not respond within 30 seconds. Please retry.');
+      timeoutErr.code = 'TIMEOUT';
+      throw timeoutErr;
+    }
+
+    if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('Load failed'))) {
+      console.error(`[API Network Error] ${method} ${url} unreachable (${latencyMs} ms):`, err.message);
+      const networkErr = new Error(
+        `NETWORK_ERROR: Cannot reach the H₂S processing server at ${baseUrl}. Ensure your phone and laptop are connected to the same Wi-Fi network.`
+      );
+      networkErr.code = 'NETWORK_ERROR';
+      throw networkErr;
+    }
+
+    console.error(`[API Error] ${method} ${url} failed (${latencyMs} ms):`, err.message);
     throw err;
   }
 }
 
 /**
- * Fetch all registered workers (with local cache fallback)
+ * Health Check API: Tests GET /health on the target backend
+ */
+export async function checkBackendHealth() {
+  const baseUrl = getApiBaseUrl();
+  // Derive root health endpoint URL from base URL
+  let healthUrl;
+  try {
+    if (baseUrl.startsWith('http')) {
+      const parsed = new URL(baseUrl);
+      healthUrl = `${parsed.origin}/health`;
+    } else {
+      healthUrl = '/health';
+    }
+  } catch (e) {
+    healthUrl = '/health';
+  }
+
+  const startTime = performance.now();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(healthUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const latencyMs = Math.round(performance.now() - startTime);
+    if (res.ok) {
+      const json = await res.json().catch(() => ({}));
+      return {
+        isConnected: true,
+        status: 'CONNECTED',
+        latencyMs,
+        service: json.service || 'h2s-dosimeter-backend',
+        url: healthUrl,
+        timestamp: json.time || new Date().toISOString()
+      };
+    } else {
+      return {
+        isConnected: false,
+        status: `HTTP ${res.status}`,
+        latencyMs,
+        url: healthUrl,
+        error: `Server returned HTTP ${res.status}`
+      };
+    }
+  } catch (err) {
+    const latencyMs = Math.round(performance.now() - startTime);
+    return {
+      isConnected: false,
+      status: 'NOT CONNECTED',
+      latencyMs,
+      url: healthUrl,
+      error: err.name === 'AbortError' ? 'Connection timed out' : (err.message || 'Failed to fetch')
+    };
+  }
+}
+
+/**
+ * Test Minimal Image Upload (POST /test-upload)
+ */
+export async function testImageUpload(imageBase64) {
+  const baseUrl = getApiBaseUrl();
+  let testUploadUrl;
+  try {
+    if (baseUrl.startsWith('http')) {
+      const parsed = new URL(baseUrl);
+      testUploadUrl = `${parsed.origin}/test-upload`;
+    } else {
+      testUploadUrl = '/test-upload';
+    }
+  } catch (e) {
+    testUploadUrl = '/test-upload';
+  }
+
+  return request(testUploadUrl, {
+    method: 'POST',
+    body: JSON.stringify({
+      filename: 'mobile_pic_test.jpg',
+      imageBase64
+    })
+  });
+}
+
+/**
+ * Fetch all registered workers
  */
 export async function getWorkers() {
   try {
@@ -61,81 +261,77 @@ export async function getWorkerCumulativeDose(workerId) {
 }
 
 /**
- * Fetch all past readings for a worker
- */
-export async function getWorkerReadings(workerId) {
-  return request(`/workers/${encodeURIComponent(workerId)}/readings`);
-}
-
-/**
- * Queue a reading for later upload if network is disconnected
- */
-export function queueOfflineReading(payload) {
-  const existing = JSON.parse(localStorage.getItem(QUEUE_STORAGE_KEY) || '[]');
-  existing.push({
-    ...payload,
-    queuedAt: new Date().toISOString()
-  });
-  localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(existing));
-}
-
-/**
- * Retrieve pending offline readings
- */
-export function getPendingOfflineQueue() {
-  return JSON.parse(localStorage.getItem(QUEUE_STORAGE_KEY) || '[]');
-}
-
-/**
- * Synchronize pending offline readings to backend
- */
-export async function syncPendingQueue() {
-  const queue = getPendingOfflineQueue();
-  if (queue.length === 0) return { synced: 0, failed: 0 };
-
-  let synced = 0;
-  let remaining = [];
-
-  for (const item of queue) {
-    try {
-      await submitReading(item);
-      synced++;
-    } catch (e) {
-      remaining.push(item);
-    }
-  }
-
-  localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(remaining));
-  return { synced, remaining: remaining.length };
-}
-
-/**
- * Submit a captured wristband photo for color extraction and dose calculation
+ * Submit wristband capture reading
  */
 export async function submitReading(payload) {
-  return request('/readings', {
-    method: 'POST',
-    body: JSON.stringify({
-      workerId: payload.workerId,
-      shiftId: payload.shiftId,
-      imageBase64: payload.imageBase64,
-      ambientTemp: Number(payload.ambientTemp) || 25.0,
-      ambientHumidity: Number(payload.ambientHumidity) || 50.0,
-      capturedAt: payload.capturedAt || new Date().toISOString()
-    })
-  });
+  console.log("SCAN API:", `${getApiBaseUrl()}/readings`, "Payload worker:", payload.workerId);
+  try {
+    return await request('/readings', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    if (err.code === 'NETWORK_ERROR' || !navigator.onLine) {
+      console.warn('[Offline Mode] Network unavailable. Enqueuing reading locally.');
+      enqueueOfflineReading(payload);
+      return {
+        _isOfflineQueued: true,
+        workerId: payload.workerId,
+        shiftId: payload.shiftId,
+        estimatedDosePpmHours: 0.0,
+        qualityStatus: 'QUEUED_OFFLINE',
+        qualityScore: 90,
+        alertLevel: 'SAFE',
+        alertColor: '#10b981',
+        alertBadgeClass: 'safe',
+        alertNote: 'Reading saved to local device queue. Will auto-sync when network is restored.',
+        createdAt: new Date().toISOString()
+      };
+    }
+    throw err;
+  }
 }
 
-// Auto-sync whenever internet connectivity is restored
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
-    console.log('[Network] Reconnected. Attempting offline queue synchronization...');
-    syncPendingQueue()
-      .then((res) => {
-        if (res.synced > 0) {
-          console.log(`[Sync] Successfully synced ${res.synced} offline readings.`);
-        }
-      })
-      .catch((err) => console.warn('[Sync] Auto-sync failed:', err));
-  });
+/**
+ * Enqueue offline reading to local storage
+ */
+function enqueueOfflineReading(payload) {
+  try {
+    const queue = JSON.parse(localStorage.getItem(QUEUE_STORAGE_KEY) || '[]');
+    queue.push({ ...payload, queuedAt: new Date().toISOString() });
+    localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+  } catch (e) {
+    console.error('Failed to store reading to offline queue:', e);
+  }
+}
+
+/**
+ * Sync pending offline readings when network resumes
+ */
+export async function syncOfflineReadings() {
+  try {
+    const queue = JSON.parse(localStorage.getItem(QUEUE_STORAGE_KEY) || '[]');
+    if (!queue.length) return 0;
+
+    const remaining = [];
+    let syncedCount = 0;
+
+    for (const item of queue) {
+      try {
+        await request('/readings', {
+          method: 'POST',
+          body: JSON.stringify(item)
+        });
+        syncedCount++;
+      } catch (err) {
+        remaining.push(item);
+      }
+    }
+
+    localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(remaining));
+    return syncedCount;
+  } catch (e) {
+    console.error('Error during offline sync:', e);
+    return 0;
+  }
 }

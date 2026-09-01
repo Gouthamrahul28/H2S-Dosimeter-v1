@@ -11,9 +11,11 @@
 ```
 h2s-dosimeter-system/
 ├── README.md                 <- Root architecture & integration guide
+├── h2s_dosimeter/            <- Scientific Camera Color Calibration & Dosimetry Engine (Python)
 ├── shared/
-│   ├── api-contract.md       <- Shared REST API specifications (Base: http://localhost:5000/api/v1)
-│   └── schema.js             <- Mongoose & data model contract definitions
+│   ├── colorimetricStandards.js  <- Shared ES module standards (CIELAB, Bradford, CIEDE2000)
+│   ├── colorimetricStandards.cjs <- Shared CommonJS standards for Node backend
+│   └── api-contract.md       <- Shared REST API specifications (Base: http://localhost:5000/api/v1)
 ├── backend/                  <- Node.js + Express + MongoDB + Sharp (Port 5000)
 ├── mobile-app/               <- React (Vite) PWA Field Camera App (Port 5173)
 └── dashboard/                <- React (Vite) + Recharts Safety Supervisor Web App (Port 5174)
@@ -23,8 +25,9 @@ h2s-dosimeter-system/
 
 ## Technology Stack & Ports
 
-| Subsystem | Stack | Dev Port | Environment Config |
+| Subsystem | Stack | Dev Port / CLI | Details |
 |---|---|---|---|
+| **`h2s_dosimeter`** | Python 3.13, NumPy, SciPy, OpenCV, Matplotlib, Pytest | CLI / Package | Linear RGB → CCM → Bradford CAT → CIELAB → CIEDE2000 → Calibrated Dose |
 | **`backend`** | Node.js, Express, MongoDB (Mongoose), Sharp | `5000` | `PORT=5000`<br>`MONGODB_URI=mongodb://localhost:27017/h2s-dosimeter` |
 | **`mobile-app`** | React 18, Vite, Lucide Icons, getUserMedia PWA | `5173` | `VITE_API_BASE_URL=http://localhost:5000/api/v1` |
 | **`dashboard`** | React 18, Vite, Recharts, Lucide Icons | `5174` | `VITE_API_BASE_URL=http://localhost:5000/api/v1` |
@@ -55,17 +58,32 @@ npm install
 npm run dev       # Runs Vite dev server at http://localhost:5174
 ```
 
+### Step 4: Run Scientific Python Color Calibration Engine
+```bash
+# Run automated colorimetry & CIEDE2000 unit test suite
+pytest -v h2s_dosimeter/tests
+
+# Analyze a wristband scan with full CIELAB & diagnostic trace
+python -m h2s_dosimeter.cli analyze --image path/to/scan.jpg
+
+# Fit calibration models on chamber dataset & generate validation plots
+python -m h2s_dosimeter.scripts.train_calibration
+
+# Run optical stability benchmark across illumination spectrum (2700K to 7500K)
+python -m h2s_dosimeter.scripts.evaluate_stability
+```
+
 ---
 
-## Calibration & Optical Pipeline
+## Scientific Color Calibration & Dosimetry Pipeline
 
-1. **Spatial Extraction**: Configurable region sampling extracts RGB values from:
-   - **Reference Patch** (Top-Left Quadrant, 10%–30% bounds): Standard white reference standard.
-   - **Active H₂S Strip** (Center, 38%–62% bounds): Chemical indicator that darkens permanently with cumulative H₂S exposure.
-   - **Expiry Patch** (Top-Right Quadrant, 70%–90% bounds): Shelf-life validity indicator.
-2. **Lighting Normalization**: Chromatic adaptation scales raw strip RGB against the measured reference patch to eliminate ambient illumination tint and phone sensor variance.
-3. **Swappable Calibration Engine**: Versioned curve registry (`CALIBRATION_CURVES`) maps corrected optical darkening metrics to cumulative exposure in **ppm·hours** (`placeholder-v1`), ready for empirical laboratory calibration curve drop-in.
-4. **Expiry Patch Verification**: Automatically assesses image quality and expiry degradation, flagging badges as `valid`, `expired`, or `unreadable`.
+1. **Spatial Extraction & Outlier Rejection**: Bounding box extraction with automated rejection of saturated pixels ($>0.98$), underexposed pixels ($<0.05$), and specular glare ($>2.5\sigma$).
+2. **sRGB Linearization**: Precise inverse gamma transformation ($C \le 0.04045 \to C/12.92$, $C > 0.04045 \to ((C+0.055)/1.055)^{2.4}$).
+3. **Camera Characterization (CCM)**: Device-specific Color Correction Matrix transforming linear RGB to CIE XYZ tristimulus values.
+4. **Bradford Chromatic Adaptation**: Cone-response transform mapping measured scene illuminant ($\mathbf{W}_{\text{src}}$) to Standard D65 daylight ($\mathbf{W}_{\text{ref}}$).
+5. **CIE 1976 CIELAB**: Non-linear perceptual color coordinate conversion ($L^*, a^*, b^*$).
+6. **CIEDE2000 ($\Delta E_{00}$)**: Standard total color difference metric accounting for lightness, chroma, hue non-linearities and blue rotation interactions.
+7. **Experimental Dose Model**: Pluggable models (Piecewise spline and Polynomial surface regression) mapping $(\Delta E_{00}, T, RH) \to \text{Dose}$ [ppm·hours] with explicit `"OUTSIDE CALIBRATION RANGE"` detection.
 
 ---
 

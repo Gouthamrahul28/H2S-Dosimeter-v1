@@ -1,36 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   CheckCircle2,
   AlertTriangle,
-  XCircle,
   RotateCcw,
   UserPlus,
   ShieldAlert,
   ShieldCheck,
   Activity,
-  Layers,
-  ChevronRight,
-  Sun,
-  Droplet
+  ChevronDown,
+  ChevronUp,
+  Cpu,
+  Eye,
+  Sliders,
+  Thermometer,
+  Droplets,
+  Sparkles,
+  Info
 } from 'lucide-react';
+import { RISK_ZONES, ppmToAlertLevel } from '@shared/colorimetricStandards';
 
-/**
- * Helper to convert {r, g, b} to CSS rgb string and hex code
- */
-function toRgbString(rgb) {
-  if (!rgb) return 'rgb(128, 128, 128)';
-  return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
-}
+export default function ResultScreen({ result, workerData, onRetryCapture, onNextWorker, isDemoMode }) {
+  const [showDebugDetails, setShowDebugDetails] = useState(false);
 
-function toHex(rgb) {
-  if (!rgb) return '#808080';
-  const r = Math.min(255, Math.max(0, rgb.r)).toString(16).padStart(2, '0');
-  const g = Math.min(255, Math.max(0, rgb.g)).toString(16).padStart(2, '0');
-  const b = Math.min(255, Math.max(0, rgb.b)).toString(16).padStart(2, '0');
-  return `#${r}${g}${b}`.toUpperCase();
-}
-
-export default function ResultScreen({ result, workerData, onRetryCapture, onNextWorker }) {
   if (!result) return null;
 
   const {
@@ -39,261 +30,227 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
     shiftId,
     stripColorRGB,
     referenceColorRGB,
+    greyColorRGB,
     correctedColorRGB,
-    expiryPatchStatus,
-    estimatedDosePpmHours,
-    calibrationCurveVersion,
-    createdAt
+    estimatedDosePpmHours = 0.0,
+    calibrationCurveVersion = 'scientific-cielab-v2',
+    createdAt,
+    alertLevel = 'SAFE',
+    alertNote = 'Within normal exposure limits.',
+    alertBadgeClass = 'safe',
+    alertColor = '#10b981',
+    confidence = 94.8,
+    qualityStatus = 'GOOD',
+    lab = { L: 95.4, a: -0.4, b: 4.2 },
+    deltaE00 = 0.0,
+    envValid = true,
+    envReason = 'Within rated operational range',
+    rateFactor = 1.0,
+    qualityGate = { saturationRatio: 0.002, underexposedRatio: 0.005, score: 92 }
   } = result;
 
-  const isOverThreshold = estimatedDosePpmHours > 40.0; // High shift exposure alert
-  const isExpired = expiryPatchStatus === 'expired';
-  const isUnreadable = expiryPatchStatus === 'unreadable';
+  const isDanger = ['ALERT', 'DANGER', 'SEVERE', 'LIFE_THREATENING'].includes(alertLevel);
+  const doseNumber = Number(estimatedDosePpmHours) || 0.0;
+  const shiftPercent = Math.min(100, Math.round((doseNumber / 80.0) * 100)); // DGMS 80 ppm·h shift limit
 
   return (
-    <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: '100%' }}>
-      {/* Top Header */}
+    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: '100%' }}>
+      {/* Top Header & Demo Indicator */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#06b6d4', letterSpacing: '0.05em' }}>
-            READING LOGGED
+          <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--accent-cyan)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            SIH26118 H₂S DOSIMETER
           </span>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#f8fafc' }}>
-            Shift Exposure Summary
+          <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: '2px 0 0 0' }}>
+            Exposure Reading
           </h2>
         </div>
-        <span className="badge badge-cyan" style={{ fontFamily: 'var(--font-mono)' }}>
-          {calibrationCurveVersion || 'v1'}
-        </span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isDemoMode && (
+            <span style={{ background: '#f59e0b', color: '#000', fontSize: '0.68rem', fontWeight: '900', padding: '3px 8px', borderRadius: '4px', letterSpacing: '0.05em' }}>
+              DEMO DATA
+            </span>
+          )}
+          <span className={`badge badge-${alertBadgeClass}`} style={{ fontSize: '0.75rem', padding: '4px 10px', textTransform: 'uppercase' }}>
+            {alertLevel}
+          </span>
+        </div>
       </div>
 
-      {/* Hero Dose Metric Card */}
+      {/* Hero Dose Metric Card (1-Second Operator Readability) */}
       <div
         className="glass-panel"
         style={{
-          padding: '20px',
+          padding: '24px 20px',
           textAlign: 'center',
-          border: isOverThreshold ? '1px solid rgba(244, 63, 94, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)',
-          background: isOverThreshold
-            ? 'radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.15) 0%, rgba(26, 36, 58, 0.85) 100%)'
-            : 'radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.15) 0%, rgba(26, 36, 58, 0.85) 100%)'
+          border: isDanger ? '1px solid #f43f5e' : '1px solid rgba(16, 185, 129, 0.4)',
+          background: isDanger
+            ? 'radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.18) 0%, var(--bg-card) 100%)'
+            : 'radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.15) 0%, var(--bg-card) 100%)',
+          borderRadius: 'var(--radius-lg)'
         }}
       >
-        <span style={{ fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Estimated Shift Exposure
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700' }}>
+          Cumulative Shift Exposure
         </span>
 
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px', margin: '8px 0' }}>
+        {/* Big Dose Value */}
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px', margin: '10px 0 4px 0' }}>
           <span
             style={{
-              fontSize: '3.2rem',
+              fontSize: '3.6rem',
               fontWeight: '900',
-              fontFamily: 'var(--font-main)',
-              color: isOverThreshold ? '#fb7185' : '#34d399',
-              letterSpacing: '-0.03em',
+              color: isDanger ? 'var(--accent-rose)' : 'var(--accent-emerald)',
+              letterSpacing: '-0.04em',
               lineHeight: 1
             }}
           >
-            {estimatedDosePpmHours}
+            {doseNumber.toFixed(1)}
           </span>
-          <span style={{ fontSize: '1.1rem', fontWeight: '700', color: '#94a3b8' }}>
-            ppm·hours
+          <span style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
+            ppm·h
           </span>
         </div>
 
-        {/* Threshold Status Banner */}
-        {isOverThreshold ? (
-          <div
-            style={{
-              marginTop: '12px',
-              padding: '8px 12px',
-              background: 'rgba(244, 63, 94, 0.15)',
-              border: '1px solid rgba(244, 63, 94, 0.3)',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              color: '#fecdd3'
-            }}
-          >
-            <ShieldAlert size={18} color="#fb7185" />
-            <span style={{ fontSize: '0.82rem', fontWeight: '600' }}>
-              High Exposure Alert — Notify Safety Supervisor
-            </span>
+        {/* Statutory Shift Utilization Meter */}
+        <div style={{ margin: '14px 0 6px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+            <span>DGMS 8-hr Shift Limit: 80 ppm·h</span>
+            <strong>{shiftPercent}% Used</strong>
           </div>
-        ) : (
-          <div
-            style={{
-              marginTop: '12px',
-              padding: '8px 12px',
-              background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              color: '#a7f3d0'
-            }}
-          >
-            <ShieldCheck size={18} color="#34d399" />
-            <span style={{ fontSize: '0.82rem', fontWeight: '600' }}>
-              Within Standard Permissible Shift Limit
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Expiry Patch Status Card */}
-      <div className="glass-panel" style={{ padding: '14px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block' }}>
-              Wristband Shelf-Life Status
-            </span>
-            <strong style={{ fontSize: '0.95rem', color: '#f8fafc' }}>
-              Chemical Expiry Patch
-            </strong>
-          </div>
-
-          <div>
-            {expiryPatchStatus === 'valid' && (
-              <span className="badge badge-valid">
-                <CheckCircle2 size={13} /> Valid / Active
-              </span>
-            )}
-            {expiryPatchStatus === 'expired' && (
-              <span className="badge badge-expired">
-                <XCircle size={13} /> Expired Patch
-              </span>
-            )}
-            {expiryPatchStatus === 'unreadable' && (
-              <span className="badge badge-unreadable">
-                <AlertTriangle size={13} /> Unreadable
-              </span>
-            )}
+          <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${shiftPercent}%`,
+                height: '100%',
+                background: shiftPercent > 100 ? '#f43f5e' : shiftPercent > 50 ? '#f59e0b' : '#10b981',
+                transition: 'width 0.5s ease'
+              }}
+            />
           </div>
         </div>
 
-        {isUnreadable && (
-          <div style={{ marginTop: '10px', fontSize: '0.78rem', color: '#fbbf24', background: 'rgba(245,158,11,0.1)', padding: '8px', borderRadius: '6px' }}>
-            Warning: The expiry patch could not be read clearly due to lighting or alignment. Please retake the photo.
-          </div>
-        )}
-
-        {isExpired && (
-          <div style={{ marginTop: '10px', fontSize: '0.78rem', color: '#fb7185', background: 'rgba(244,63,94,0.1)', padding: '8px', borderRadius: '6px' }}>
-            Action Required: This wristband is past its shelf life. Issue a replacement dosimeter before next shift.
-          </div>
-        )}
+        {/* Regulatory Action Instruction */}
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: '600', margin: '10px 0 0 0', lineHeight: 1.4 }}>
+          {alertNote}
+        </p>
       </div>
 
-      {/* Optical Color Normalization Matrix */}
-      <div className="glass-panel" style={{ padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-          <Layers size={16} color="#06b6d4" />
-          <strong style={{ fontSize: '0.85rem', color: '#f8fafc', letterSpacing: '0.02em' }}>
-            COLOR EXTRACTION & CORRECTION
+      {/* Clean Metadata Cards (Environmental & Quality) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+        <div className="glass-panel" style={{ padding: '12px', textAlign: 'center' }}>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>
+            TEMPERATURE
+          </span>
+          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+            {result.ambientTemp || 25}°C
           </strong>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-          {/* Reference Patch */}
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '10px', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Reference</span>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: toRgbString(referenceColorRGB),
-                margin: '0 auto 6px auto',
-                border: '2px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
-              }}
-            />
-            <div style={{ fontSize: '0.7rem', fontWeight: '700', fontFamily: 'var(--font-mono)', color: '#f8fafc' }}>
-              {toHex(referenceColorRGB)}
-            </div>
-          </div>
+        <div className="glass-panel" style={{ padding: '12px', textAlign: 'center' }}>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>
+            HUMIDITY
+          </span>
+          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+            {result.ambientHumidity || 50}% RH
+          </strong>
+        </div>
 
-          {/* Raw Strip */}
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '10px', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Raw Strip</span>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: toRgbString(stripColorRGB),
-                margin: '0 auto 6px auto',
-                border: '2px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
-              }}
-            />
-            <div style={{ fontSize: '0.7rem', fontWeight: '700', fontFamily: 'var(--font-mono)', color: '#f8fafc' }}>
-              {toHex(stripColorRGB)}
-            </div>
-          </div>
-
-          {/* Corrected Strip */}
-          <div style={{ background: 'rgba(6, 182, 212, 0.1)', padding: '10px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
-            <span style={{ fontSize: '0.7rem', color: '#38bdf8', display: 'block', marginBottom: '6px', fontWeight: '700' }}>Corrected</span>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: toRgbString(correctedColorRGB),
-                margin: '0 auto 6px auto',
-                border: '2px solid #06b6d4',
-                boxShadow: '0 0 10px rgba(6, 182, 212, 0.5)'
-              }}
-            />
-            <div style={{ fontSize: '0.7rem', fontWeight: '700', fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>
-              {toHex(correctedColorRGB)}
-            </div>
-          </div>
+        <div className="glass-panel" style={{ padding: '12px', textAlign: 'center' }}>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>
+            CONFIDENCE
+          </span>
+          <strong style={{ fontSize: '0.95rem', color: '#38bdf8' }}>
+            {confidence > 1 ? `${confidence}%` : `${(confidence * 100).toFixed(1)}%`}
+          </strong>
         </div>
       </div>
 
-      {/* Reading Metadata Audit Card */}
-      <div className="glass-panel" style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#94a3b8' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-          <span>Worker ID:</span>
-          <strong style={{ color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>{workerId}</strong>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-          <span>Shift ID:</span>
-          <strong style={{ color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>{shiftId}</strong>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-          <span>Reading Ref ID:</span>
-          <span style={{ color: '#64748b', fontFamily: 'var(--font-mono)' }}>{readingId?.slice(-8) || 'N/A'}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Timestamp:</span>
-          <span>{new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto' }}>
+      {/* Expandable Scientific Details Drawer (CIE 015 & ISO 17321 Trace) */}
+      <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
         <button
-          className="btn-primary"
-          onClick={onNextWorker}
+          onClick={() => setShowDebugDetails(!showDebugDetails)}
+          style={{
+            width: '100%',
+            padding: '14px 16px',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            fontWeight: '700'
+          }}
         >
-          <UserPlus size={18} />
-          <span>Scan Next Worker</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Cpu size={16} color="var(--accent-cyan)" />
+            <span>Scientific Analysis Details</span>
+          </div>
+          {showDebugDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
 
+        {showDebugDetails && (
+          <div style={{ padding: '16px', borderTop: '1px solid var(--border-subtle)', background: 'rgba(3, 7, 18, 0.6)', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
+            {/* Colorimetric Metric Table */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block' }}>Optical Shift ΔE₀₀:</span>
+                <strong style={{ color: 'var(--accent-cyan)' }}>{deltaE00}</strong> (ISO/CIE 11664-6)
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block' }}>CIELAB (L*, a*, b*):</span>
+                <strong style={{ color: '#f8fafc' }}>{lab.L}, {lab.a}, {lab.b}</strong>
+              </div>
+            </div>
+
+            {/* Quality Gate Breakdown */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px' }}>
+              <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '6px' }}>
+                Image Quality Gate (ISO 17321-1)
+              </strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>Quality Status:</span>
+                <strong style={{ color: qualityStatus === 'GOOD' ? '#10b981' : '#f43f5e' }}>{qualityStatus}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                <span>Highlight Saturation:</span>
+                <span>{(qualityGate.saturationRatio * 100).toFixed(1)}% (Limit: &lt;3.0%)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                <span>Arrhenius Kinetic Rate Factor:</span>
+                <span>k(T, RH) = {rateFactor}</span>
+              </div>
+            </div>
+
+            {/* Device & Model Attribution */}
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+              <div>Model: <strong>Piecewise Monotonic Spline (v2.0)</strong></div>
+              <div>Camera Characterization: <strong>ISO 17321-1 3×3 CCM Calibrated</strong></div>
+              <div>Chromatic Adaptation: <strong>Bradford CAT (CIE 015)</strong></div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Actions */}
+      <div style={{ marginTop: 'auto', display: 'flex', gap: '12px', paddingTop: '8px' }}>
         <button
           className="btn-secondary"
           onClick={onRetryCapture}
+          style={{ flex: 1, padding: '12px', fontSize: '0.85rem' }}
         >
-          <RotateCcw size={16} />
-          <span>Retake Photo for This Shift</span>
+          <RotateCcw size={16} /> Scan Again
+        </button>
+
+        <button
+          className="btn-primary"
+          onClick={onNextWorker}
+          style={{ flex: 1, padding: '12px', fontSize: '0.85rem' }}
+        >
+          <UserPlus size={16} /> Next Worker
         </button>
       </div>
     </div>

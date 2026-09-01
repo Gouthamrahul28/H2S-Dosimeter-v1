@@ -88,10 +88,10 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
             <ArrowLeft size={16} /> Overview
           </button>
           <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#f8fafc' }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)' }}>
               Worker Exposure Dosimetry Log
             </h1>
-            <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
               Shift-by-shift photometric analysis & exposure accumulation
             </span>
           </div>
@@ -99,8 +99,8 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
 
         {/* Worker Switcher Dropdown */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <User size={16} color="#94a3b8" />
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Select Worker:</span>
+          <User size={16} color="var(--text-muted)" />
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Select Worker:</span>
           <select
             className="input-control"
             value={selectedWorkerId}
@@ -127,12 +127,12 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                   width: '44px',
                   height: '44px',
                   borderRadius: '12px',
-                  background: isOver ? 'rgba(244, 63, 94, 0.2)' : 'rgba(6, 182, 212, 0.15)',
-                  border: isOver ? '1px solid rgba(244, 63, 94, 0.4)' : '1px solid rgba(6, 182, 212, 0.3)',
+                  background: isOver ? 'rgba(244, 63, 94, 0.15)' : 'rgba(6, 182, 212, 0.12)',
+                  border: isOver ? '1px solid rgba(244, 63, 94, 0.35)' : '1px solid rgba(6, 182, 212, 0.3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isOver ? '#fb7185' : '#38bdf8',
+                  color: isOver ? 'var(--accent-rose)' : 'var(--accent-cyan)',
                   fontWeight: '800',
                   fontSize: '1.1rem',
                   fontFamily: 'var(--font-mono)'
@@ -141,23 +141,23 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                 {selectedWorkerId}
               </div>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#f8fafc' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)' }}>
                   {currentWorker.name}
                 </h2>
-                <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                   {currentWorker.department}
                 </span>
               </div>
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              Logged Shifts: <strong style={{ color: '#cbd5e1' }}>{readings.length}</strong>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Logged Shifts: <strong style={{ color: 'var(--text-primary)' }}>{readings.length}</strong>
             </span>
           </div>
 
           {/* Cumulative Dose Metric */}
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ background: 'var(--bg-table-header)', padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
                 Cumulative Total Dose
               </span>
               <ThresholdBadge
@@ -173,18 +173,18 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                   fontSize: '2.2rem',
                   fontWeight: '900',
                   fontFamily: 'var(--font-mono)',
-                  color: isOver ? '#fb7185' : percent >= 75 ? '#fbbf24' : '#38bdf8'
+                  color: isOver ? 'var(--accent-rose)' : percent >= 75 ? 'var(--accent-amber)' : 'var(--accent-cyan)'
                 }}
               >
                 {totalDose.toFixed(1)}
               </span>
-              <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                 / {threshold} ppm·h
               </span>
             </div>
 
             {/* Threshold progress bar */}
-            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', marginTop: '8px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '6px', background: 'var(--border-subtle)', borderRadius: '3px', marginTop: '8px', overflow: 'hidden' }}>
               <div
                 style={{
                   height: '100%',
@@ -205,10 +205,10 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
       <div className="glass-card" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#f8fafc' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)' }}>
               Reading-by-Reading Audit Trail
             </h3>
-            <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
               Individual optical patch extractions, lighting normalization & shift doses
             </span>
           </div>
@@ -249,24 +249,24 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                   <tr key={r.readingId || i}>
                     {/* Shift ID */}
                     <td>
-                      <strong style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>
+                      <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
                         {r.shiftId}
                       </strong>
                     </td>
 
                     {/* Timestamp */}
                     <td>
-                      <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>
                         {new Date(r.capturedAt || r.createdAt).toLocaleDateString()}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                         {new Date(r.capturedAt || r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </td>
 
                     {/* Ambient Env */}
                     <td>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{r.ambientTemp || 25}°C</span>
                         <span>&bull;</span>
                         <span>{r.ambientHumidity || 50}% RH</span>
@@ -282,10 +282,10 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                             height: '18px',
                             borderRadius: '50%',
                             background: toRgbString(r.referenceColorRGB),
-                            border: '1px solid rgba(255,255,255,0.3)'
+                            border: '1px solid var(--border-subtle)'
                           }}
                         />
-                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: '#94a3b8' }}>
+                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                           {toHex(r.referenceColorRGB)}
                         </span>
                       </div>
@@ -300,10 +300,10 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                             height: '18px',
                             borderRadius: '50%',
                             background: toRgbString(r.stripColorRGB),
-                            border: '1px solid rgba(255,255,255,0.3)'
+                            border: '1px solid var(--border-subtle)'
                           }}
                         />
-                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: '#94a3b8' }}>
+                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                           {toHex(r.stripColorRGB)}
                         </span>
                       </div>
@@ -318,11 +318,11 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                             height: '18px',
                             borderRadius: '50%',
                             background: toRgbString(r.correctedColorRGB),
-                            border: '1.5px solid #06b6d4',
+                            border: '1.5px solid var(--accent-cyan)',
                             boxShadow: '0 0 6px rgba(6,182,212,0.4)'
                           }}
                         />
-                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: '#38bdf8', fontWeight: '700' }}>
+                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: '700' }}>
                           {toHex(r.correctedColorRGB)}
                         </span>
                       </div>
@@ -331,17 +331,17 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                     {/* Expiry Patch */}
                     <td style={{ textAlign: 'center' }}>
                       {r.expiryPatchStatus === 'valid' && (
-                        <span style={{ fontSize: '0.75rem', color: '#34d399', fontWeight: '600' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)', fontWeight: '600' }}>
                           &bull; Valid
                         </span>
                       )}
                       {r.expiryPatchStatus === 'expired' && (
-                        <span style={{ fontSize: '0.75rem', color: '#fb7185', fontWeight: '600' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-rose)', fontWeight: '600' }}>
                           &bull; Expired
                         </span>
                       )}
                       {r.expiryPatchStatus === 'unreadable' && (
-                        <span style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: '600' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-amber)', fontWeight: '600' }}>
                           &bull; Unreadable
                         </span>
                       )}
@@ -354,7 +354,7 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                           fontWeight: '800',
                           fontFamily: 'var(--font-mono)',
                           fontSize: '0.95rem',
-                          color: Number(r.estimatedDosePpmHours) > 35 ? '#fb7185' : '#f8fafc'
+                          color: Number(r.estimatedDosePpmHours) > 35 ? 'var(--accent-rose)' : 'var(--text-primary)'
                         }}
                       >
                         {Number(r.estimatedDosePpmHours || 0).toFixed(1)}

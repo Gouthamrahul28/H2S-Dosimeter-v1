@@ -5,6 +5,9 @@
   "scripts": {
     "install:all": "npm install --prefix backend && npm install --prefix mobile-app && npm install --prefix dashboard",
     "seed": "npm run seed --prefix backend",
+    "seed:large": "node seed-large-dataset.js 50 15",
+    "seed:huge": "node seed-large-dataset.js 150 25",
+    "train": "node train-calibration-model.js",
     "dev:backend": "npm start --prefix backend",
     "dev:mobile": "npm run dev --prefix mobile-app",
     "dev:dashboard": "npm run dev --prefix dashboard",
