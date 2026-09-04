@@ -50,6 +50,9 @@ export type SafetyAlertLevel =
 export interface CalibrationAnchor {
   id: number;
   name: string;
+  /** Cumulative exposure dose equivalent in ppm·hours since badge activation
+   *  (irreversible PbS deposition integrates concentration over time) —
+   *  NOT an instantaneous ambient concentration reading. */
   h2sPpm: number;
   ppmRangeMin: number;
   ppmRangeMax: number;

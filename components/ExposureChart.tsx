@@ -41,10 +41,11 @@ export const ExposureChart: React.FC<ExposureChartProps> = ({ records }) => {
         <div>
           <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-sky-400" />
-            H2S Cumulative Shift Exposure Analytics (0–100 PPM Scale)
+            H2S Cumulative Shift Exposure Analytics (0–100 ppm&middot;h Scale)
           </h3>
           <p className="text-xs text-slate-400">
-            Real-time dosimeter readings across 12-hour operational shift up to NIOSH IDLH threshold
+            Cumulative exposure dose (ppm&middot;hours), not instantaneous concentration &mdash;
+            dosimeter readings across 12-hour operational shift up to NIOSH IDLH threshold
           </p>
         </div>
 
