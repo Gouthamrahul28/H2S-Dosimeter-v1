@@ -4,9 +4,17 @@ const Reading = require('../models/Reading');
 const Worker = require('../models/Worker');
 const Strip = require('../models/Strip');
 const StripBatch = require('../models/StripBatch');
+const { processImage } = require('../services/imageProcessingPipeline');
 const { extractColorsFromImage } = require('../services/colorExtraction');
 const { normalizeLighting } = require('../services/lightingCorrection');
 const standards = require('../../../shared/colorimetricStandards.cjs');
+const {
+  normalizeChemistryId,
+  getChemistryConfig,
+  validateModelChemistryMatch,
+  CHEMISTRY_IDS
+} = require('../../../shared/chemistryRegistry.cjs');
+const { leadAcetateModelInstance } = require('../services/leadAcetateCalibrationService');
 
 // Ensure uploads folder exists
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
@@ -105,6 +113,48 @@ exports.createReading = async (req, res) => {
       });
     }
 
+    // Resolve Strip Chemistry & Configuration
+    const rawChem = assignedStrip.chemistry || batch?.chemistry || req.body.chemistry || 'CU_PAN';
+    const stripChemistry = normalizeChemistryId(rawChem) || CHEMISTRY_IDS.CU_PAN;
+    const chemistryConfig = getChemistryConfig(stripChemistry);
+
+    // Hard Isolation Rule 1: Validate Model Chemistry Match if explicitly requested
+    const requestedModelChem = req.body.model_chemistry || req.body.modelChemistry;
+    if (requestedModelChem) {
+      const matchCheck = validateModelChemistryMatch(stripChemistry, requestedModelChem);
+      if (!matchCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          error_code: matchCheck.errorCode,
+          calibration_status: 'MODEL_CHEMISTRY_MISMATCH',
+          message: matchCheck.error,
+          sensor_chemistry: stripChemistry,
+          requested_model_chemistry: normalizeChemistryId(requestedModelChem)
+        });
+      }
+    }
+
+    // Hard Isolation Rule 2: Verify calibration availability for sensor chemistry
+    if (stripChemistry === CHEMISTRY_IDS.LEAD_ACETATE) {
+      // Non-negotiable Rule: DO NOT copy Cu-PAN calibration into Lead Acetate.
+      // Explicitly report unavailable state, DO NOT return fake 0.0 ppm.
+      if (!leadAcetateModelInstance.isFitted && (!chemistryConfig.calibrationModel || chemistryConfig.calibrationStatus === 'CALIBRATION_DATA_REQUIRED')) {
+        return res.status(422).json({
+          success: false,
+          error_code: 'CALIBRATION_UNAVAILABLE',
+          calibration_status: 'CALIBRATION_DATA_REQUIRED',
+          chemistry: CHEMISTRY_IDS.LEAD_ACETATE,
+          display_name: chemistryConfig.displayName,
+          message: 'Lead Acetate calibration is not available. Real experimental calibration data is required before exposure can be calculated.',
+          strip: {
+            id: assignedStrip.stripId,
+            batch_id: assignedStrip.batchId,
+            chemistry: CHEMISTRY_IDS.LEAD_ACETATE
+          }
+        });
+      }
+    }
+
     // Check pre-scan sensing capacity & active wear expiry
     const initialLifecycle = assignedStrip.getLifecycleStatus();
     if (initialLifecycle.isExpired || initialLifecycle.isExhausted) {
@@ -114,8 +164,8 @@ exports.createReading = async (req, res) => {
 
       const errorCode = initialLifecycle.isExhausted ? 'STRIP_EXHAUSTED' : 'STRIP_EXPIRED';
       const errorMsg = initialLifecycle.isExhausted
-        ? 'Cu-PAN sensing capacity exhausted. Replace the strip before scanning.'
-        : 'Replace the Cu-PAN strip before scanning. The assigned strip has exceeded its active wear life.';
+        ? `${chemistryConfig.displayName} sensing capacity exhausted. Replace the strip before scanning.`
+        : `Replace the ${chemistryConfig.displayName} strip before scanning. The assigned strip has exceeded its active wear life.`;
 
       return res.status(400).json({
         success: false,
@@ -127,7 +177,8 @@ exports.createReading = async (req, res) => {
           max_validated_dose: assignedStrip.maxValidatedDosePpmH,
           life_used_percent: initialLifecycle.lifeUsedPercent,
           life_remaining_percent: initialLifecycle.lifeRemainingPercent,
-          status: assignedStrip.stripStatus
+          status: assignedStrip.stripStatus,
+          chemistry: stripChemistry
         }
       });
     }
@@ -136,7 +187,7 @@ exports.createReading = async (req, res) => {
     if (!imageBase64) {
       return res.status(400).json({
         success: false,
-        error: 'imageBase64 is required for Cu-PAN strip scanning'
+        error: `imageBase64 is required for ${chemistryConfig.displayName} strip scanning`
       });
     }
 
@@ -161,24 +212,102 @@ exports.createReading = async (req, res) => {
     const scanId = req.body.scan_id || `cupan_scan_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     console.log(`[Backend] Processing authorized Cu-PAN scan ${scanId} for worker ${worker.workerId} (Strip: ${assignedStrip.stripId})`);
 
-    // --- STEP 5: OPTICAL COLOR EXTRACTION & CHROMATIC NORMALIZATION ---
-    const { stripColorRGB, referenceColorRGB, greyColorRGB, expiryPatchStatus, qualityGate } = await extractColorsFromImage(imageBuffer);
-    const correctedColorRGB = normalizeLighting(stripColorRGB, referenceColorRGB);
+    // --- STEP 5: STANDARDIZED OPTICAL COLOR EXTRACTION & CHROMATIC ADAPTATION ---
+    const opticalResult = await processImage(imageBuffer, {
+      baselineLab: stripChemistry === CHEMISTRY_IDS.CU_PAN ? standards.VIRGIN_BASELINE_LAB : null
+    });
 
-    // Analyze Cu-PAN colorimetry and exposure kinetics
-    const exposureAnalysis = standards.analyzeExposure(
-      correctedColorRGB,
-      Number(ambientTemp) || 25.0,
-      Number(ambientHumidity) || 50.0
-    );
+    const stripColorRGB = opticalResult.rgb;
+    const referenceColorRGB = opticalResult.referenceColor.white.rgb;
+    const greyColorRGB = opticalResult.referenceColor.grey.rgb;
+    const correctedColorRGB = opticalResult.correctedRgb;
+    const qualityGate = opticalResult.quality;
+    if (!qualityGate.passed) {
+      console.warn(`[Backend Optical Gate] Scan rejected for worker ${worker.workerId}: ${qualityGate.reasons.join('; ')}`);
+      return res.status(422).json({
+        success: false,
+        error_code: 'IMAGE_PROCESSING_FAILED',
+        calibration_status: 'IMAGE_PROCESSING_FAILED',
+        dose: null,
+        message: `Optical image quality gate rejected frame: ${qualityGate.reasons.join('; ')}`,
+        quality: qualityGate
+      });
+    }
 
-    const calibrationCurveVersion = 'cupan-cielab-v1';
-    const scanDose = exposureAnalysis.estimatedDosePpmHours;
+    const expiryPatchStatus = qualityGate.passed ? 'valid' : 'unreadable';
+
+    // --- STEP 6: CHEMISTRY-SPECIFIC EXPOSURE DOSIMETRY INTERPRETATION ---
+    let scanDose = null;
+    let exposureAnalysis = null;
+    let calibrationCurveVersion = 'cupan-cielab-v1';
+
+    if (stripChemistry === CHEMISTRY_IDS.CU_PAN) {
+      // Analyze Cu-PAN exposure kinetics using chromatically adapted Lab & CIEDE2000
+      const deltaE00 = opticalResult.deltaE00 !== null ? opticalResult.deltaE00 : standards.ciede2000(standards.VIRGIN_BASELINE_LAB, opticalResult.lab);
+      const doseEst = standards.estimateDoseFromDeltaE(deltaE00, Number(ambientTemp) || 25.0, Number(ambientHumidity) || 50.0);
+      const riskZone = standards.ppmToAlertLevel(doseEst.dosePpmHours);
+
+      exposureAnalysis = {
+        chemistry: 'Cu-PAN',
+        dose: doseEst.dosePpmHours,
+        estimatedDosePpmHours: doseEst.dosePpmHours,
+        unit: 'ppm·h',
+        alertLevel: riskZone.level,
+        alertColor: riskZone.color,
+        badgeClass: riskZone.badgeClass,
+        note: riskZone.note,
+        deltaE00,
+        lab: opticalResult.lab,
+        inRange: doseEst.inRange,
+        isVirginBaseline: !!doseEst.isVirginBaseline,
+        calibrationStatus: doseEst.status,
+        confidence: qualityGate.passed ? (doseEst.inRange ? 0.94 : 0.60) : 0.40
+      };
+
+      scanDose = doseEst.dosePpmHours;
+    } else if (stripChemistry === CHEMISTRY_IDS.LEAD_ACETATE) {
+      // Analyze Lead Acetate exposure using fitted LeadAcetateModelV1
+      const pred = leadAcetateModelInstance.predict({
+        sensor_chemistry: CHEMISTRY_IDS.LEAD_ACETATE,
+        deltaE00: opticalResult.deltaE00,
+        L: opticalResult.lab.L,
+        a: opticalResult.lab.a,
+        b: opticalResult.lab.b,
+        temperature: Number(ambientTemp) || 25.0,
+        humidity: Number(ambientHumidity) || 50.0
+      });
+
+      const isSafe = (pred.dosePpmHours || 0) <= 5.0;
+      const isWarning = (pred.dosePpmHours || 0) > 5.0 && (pred.dosePpmHours || 0) <= 15.0;
+      const alertLvl = pred.status === 'VALID_ESTIMATE' ? (isSafe ? 'SAFE' : isWarning ? 'WARNING' : 'DANGER') : 'CAUTION';
+
+      exposureAnalysis = {
+        chemistry: 'LEAD_ACETATE',
+        dose: pred.dosePpmHours,
+        estimatedDosePpmHours: pred.dosePpmHours,
+        unit: 'mL_H2S',
+        alertLevel: alertLvl,
+        alertColor: alertLvl === 'SAFE' ? '#10b981' : alertLvl === 'WARNING' ? '#f59e0b' : '#f43f5e',
+        badgeClass: alertLvl === 'SAFE' ? 'safe' : alertLvl === 'WARNING' ? 'warning' : 'severe',
+        note: `Lead acetate optical darkening relative dose: ${pred.dosePpmHours !== null ? pred.dosePpmHours.toFixed(1) : '--'} mL H2S`,
+        deltaE00: opticalResult.deltaE00,
+        lab: opticalResult.lab,
+        inRange: pred.isCalibratedDomain,
+        isVirginBaseline: pred.dosePpmHours === 0.0,
+        calibrationStatus: pred.status,
+        confidence: pred.confidence
+      };
+
+      scanDose = pred.dosePpmHours;
+      calibrationCurveVersion = 'lead_acetate_model_v1';
+    }
 
     // --- STEP 6: ACCUMULATE STRIP SENSING DOSE & COMPUTE REMAINING LIFE ---
-    assignedStrip.cumulativeDosePpmH = Number((assignedStrip.cumulativeDosePpmH || 0) + scanDose);
-    assignedStrip.currentDose = scanDose;
-    assignedStrip.scanCount = (assignedStrip.scanCount || 0) + 1;
+    if (scanDose !== null && typeof scanDose === 'number') {
+      assignedStrip.cumulativeDosePpmH = Number((assignedStrip.cumulativeDosePpmH || 0) + scanDose);
+      assignedStrip.currentDose = scanDose;
+      assignedStrip.scanCount = (assignedStrip.scanCount || 0) + 1;
+    }
 
     // Compute updated post-scan lifecycle
     const updatedLifecycle = assignedStrip.getLifecycleStatus();
@@ -199,16 +328,17 @@ exports.createReading = async (req, res) => {
       lifeRemainingPercent: updatedLifecycle.lifeRemainingPercent !== null ? updatedLifecycle.lifeRemainingPercent : 100,
       stripStatus: updatedLifecycle.stripStatus,
       imageUrl,
-      chemistry: 'Cu-PAN',
+      chemistry: stripChemistry,
       cameraProfile: req.body.cameraProfile || 'mobile_001',
       stripColorRGB,
       referenceColorRGB,
       greyColorRGB,
       correctedColorRGB: { r: correctedColorRGB.r, g: correctedColorRGB.g, b: correctedColorRGB.b },
-      lab: exposureAnalysis.lab,
-      deltaE00: exposureAnalysis.deltaE00,
-      confidence: qualityGate.passed ? 0.94 : 0.40,
-      calibrationStatus: exposureAnalysis.inRange ? 'VALID' : 'OUTSIDE CALIBRATION RANGE',
+      lab: exposureAnalysis ? exposureAnalysis.lab : opticalResult.lab,
+      deltaE00: exposureAnalysis ? exposureAnalysis.deltaE00 : opticalResult.deltaE00,
+      confidence: qualityGate.passed ? (exposureAnalysis?.confidence || 0.94) : 0.40,
+      calibrationStatus: exposureAnalysis ? (exposureAnalysis.inRange ? (exposureAnalysis.calibrationStatus || 'VALID') : 'OUTSIDE CALIBRATION RANGE') : 'CALIBRATION_UNAVAILABLE',
+      isVirginBaseline: exposureAnalysis?.isVirginBaseline || false,
       expiryPatchStatus,
       ambientTemp: Number(ambientTemp) || 25.0,
       ambientHumidity: Number(ambientHumidity) || 50.0,
@@ -220,16 +350,19 @@ exports.createReading = async (req, res) => {
 
     await reading.save();
 
-    console.log(`[Backend] Completed Cu-PAN scan ${scanId} -> Dose: ${scanDose} ppm·h | Strip Cumulative: ${assignedStrip.cumulativeDosePpmH.toFixed(2)} ppm·h | Remaining Life: ${updatedLifecycle.lifeRemainingPercent}% (${updatedLifecycle.statusLabel})`);
+    const displayUnit = exposureAnalysis?.unit || 'ppm·h';
+    console.log(`[Backend] Completed ${stripChemistry} scan ${scanId} -> Dose: ${scanDose !== null ? scanDose : '--'} ${displayUnit} | Strip Cumulative: ${assignedStrip.cumulativeDosePpmH.toFixed(2)} | Remaining Life: ${updatedLifecycle.lifeRemainingPercent}% (${updatedLifecycle.statusLabel})`);
 
     // --- STEP 8: RETURN AUTHORITATIVE RESPONSE ---
     return res.status(201).json({
       success: true,
       readingId: reading._id.toString(),
       scan_id: scanId,
-      chemistry: 'Cu-PAN',
+      chemistry: stripChemistry,
+      chemistry_display: chemistryConfig.displayName,
       dose: scanDose,
-      unit: 'ppm·h',
+      unit: displayUnit,
+      isVirginBaseline: exposureAnalysis?.isVirginBaseline || false,
       worker: {
         id: worker.workerId,
         name: worker.name,
@@ -237,22 +370,23 @@ exports.createReading = async (req, res) => {
       },
       measurement: {
         dose: scanDose,
-        unit: 'ppm·h',
+        unit: displayUnit,
         confidence: reading.confidence,
-        alert_level: exposureAnalysis.alertLevel,
-        alert_badge: exposureAnalysis.badgeClass,
-        deltaE00: exposureAnalysis.deltaE00,
-        lab: exposureAnalysis.lab,
-        calibration_status: reading.calibrationStatus
+        alert_level: exposureAnalysis?.alertLevel || 'SAFE',
+        alert_badge: exposureAnalysis?.badgeClass || 'safe',
+        deltaE00: exposureAnalysis?.deltaE00 || opticalResult.deltaE00,
+        lab: exposureAnalysis?.lab || opticalResult.lab,
+        calibration_status: reading.calibrationStatus,
+        isVirginBaseline: exposureAnalysis?.isVirginBaseline || false
       },
       model: {
-        model_version: 'CUPAN-MODEL-v2.0',
-        dataset_version: 'CUPAN-DATA-200-v2',
+        model_version: stripChemistry === CHEMISTRY_IDS.LEAD_ACETATE ? 'LEAD_ACETATE_MODEL_V1' : 'CUPAN-MODEL-v2.0',
+        dataset_version: stripChemistry === CHEMISTRY_IDS.LEAD_ACETATE ? 'LEAD_ACETATE_DATASET_V1' : 'CUPAN-DATA-200-v2',
         calibration_status: reading.calibrationStatus,
-        chemistry: 'Cu-PAN'
+        chemistry: stripChemistry
       },
-      model_version: 'CUPAN-MODEL-v2.0',
-      dataset_version: 'CUPAN-DATA-200-v2',
+      model_version: stripChemistry === CHEMISTRY_IDS.LEAD_ACETATE ? 'LEAD_ACETATE_MODEL_V1' : 'CUPAN-MODEL-v2.0',
+      dataset_version: stripChemistry === CHEMISTRY_IDS.LEAD_ACETATE ? 'LEAD_ACETATE_DATASET_V1' : 'CUPAN-DATA-200-v2',
       strip: {
         id: assignedStrip.stripId,
         batch_id: assignedStrip.batchId,
@@ -266,7 +400,8 @@ exports.createReading = async (req, res) => {
         expires_at: assignedStrip.activeExpiryAt,
         time_remaining_seconds: updatedLifecycle.remainingSeconds,
         time_remaining_formatted: formatRemaining(updatedLifecycle.remainingSeconds),
-        active_life_validated: !!assignedStrip.activeExpiryAt
+        active_life_validated: !!assignedStrip.activeExpiryAt,
+        chemistry: stripChemistry
       },
       strip_life: {
         remaining_percent: updatedLifecycle.lifeRemainingPercent,
@@ -287,6 +422,9 @@ exports.createReading = async (req, res) => {
         remaining_formatted: formatRemaining(updatedLifecycle.remainingSeconds)
       },
       // Backward compatibility fields for dashboard and mobile clients
+      sensor_chemistry: stripChemistry,
+      quality: qualityGate,
+      quality_score: qualityGate?.score || 95,
       estimatedDosePpmHours: scanDose,
       alertLevel: exposureAnalysis.alertLevel,
       badgeClass: exposureAnalysis.badgeClass,
@@ -302,7 +440,7 @@ exports.createReading = async (req, res) => {
     });
   } catch (error) {
     console.error('[ReadingController] Error processing scan:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error while processing Cu-PAN scan.' });
+    return res.status(500).json({ success: false, error: 'Internal server error while processing dosimeter scan.' });
   }
 };
 

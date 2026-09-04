@@ -378,8 +378,14 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
 
                       {/* Calibration Status */}
                       <td style={{ textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)', fontWeight: '600' }}>
-                          ● Valid (Cu-PAN)
+                        <span style={{ 
+                          fontSize: '0.75rem', 
+                          color: (r.calibrationStatus === 'VALID' || r.calibrationStatus === 'VALID_ESTIMATE') ? 'var(--accent-emerald)' : 'var(--accent-amber)', 
+                          fontWeight: '600' 
+                        }}>
+                          ● {r.calibrationStatus === 'VALID' || r.calibrationStatus === 'VALID_ESTIMATE' 
+                              ? `Valid (${r.sensorChemistry || 'Cu-PAN'})` 
+                              : (r.calibrationStatus || 'PENDING')}
                         </span>
                       </td>
 
@@ -389,10 +395,14 @@ export default function WorkerHistory({ initialWorkerId = 'W1023', onBack }) {
                           style={{
                             fontFamily: 'var(--font-mono)',
                             fontSize: '0.9rem',
-                            color: (r.estimatedDosePpmHours || r.dose || 0) > 20 ? 'var(--accent-rose)' : 'var(--text-primary)'
+                            color: ((r.dose ?? r.estimatedDosePpmHours ?? 0) > 20) ? 'var(--accent-rose)' : 'var(--text-primary)'
                           }}
                         >
-                          {(r.estimatedDosePpmHours || r.dose || 0).toFixed(1)}
+                          {(r.dose !== null && r.dose !== undefined) 
+                            ? Number(r.dose).toFixed(1) 
+                            : ((r.estimatedDosePpmHours !== null && r.estimatedDosePpmHours !== undefined) 
+                                ? Number(r.estimatedDosePpmHours).toFixed(1) 
+                                : '--')}
                         </strong>
                       </td>
 

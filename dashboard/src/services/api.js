@@ -249,4 +249,11 @@ export async function getCalibrationTrends() {
   return request('/calibration/trends');
 }
 
+/**
+ * Get Lead Acetate experimental calibration dataset and fit metrics
+ */
+export async function getLeadAcetateDataset() {
+  return request('/calibration/lead-acetate/dataset');
+}
+
 

@@ -26,6 +26,10 @@ export default function CaptureScreen({ workerData, onBack, onComplete }) {
     const payload = {
       workerId: workerData.workerId,
       shiftId: workerData.shiftId,
+      chemistry: workerData.chemistry,
+      sensor_chemistry: workerData.chemistry,
+      stripBatch: workerData.stripBatch,
+      assignedStripId: workerData.assignedStripId,
       imageBase64,
       ambientTemp,
       ambientHumidity,

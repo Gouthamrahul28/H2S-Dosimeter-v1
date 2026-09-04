@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "test": "node tests/test_chemistry_abstraction.js && node tests/test_common_image_pipeline.js && node tests/test_lead_acetate_calibration.js && node tests/test_phase6_phase7_node.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

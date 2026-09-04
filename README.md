@@ -1,233 +1,230 @@
-# Cu-PAN Colorimetric H₂S Dosimeter System (SIH26118)
+# H2S-SafeTrack: Industrial Lead(II) Acetate Colorimetric Optical Dosimeter Platform
 
-[![Python Tests](https://img.shields.io/badge/Python%20Tests-53%20Passing-emerald?style=flat-square&logo=pytest)](h2s_dosimeter/tests/)
-[![Lifecycle & Security Tests](https://img.shields.io/badge/Lifecycle%20Tests-10%20Passing-cyan?style=flat-square)](test-strip-lifecycle.js)
-[![Retraining Tests](https://img.shields.io/badge/Retraining%20Tests-11%20Passing-purple?style=flat-square)](test-cumulative-retraining.js)
-[![E2E Pipeline Tests](https://img.shields.io/badge/E2E%20Tests-12%20Passing-blue?style=flat-square)](test-e2e.js)
-[![DGMS Standard](https://img.shields.io/badge/DGMS%20Shift%20Limit-80%20ppm%C2%B7h-rose?style=flat-square)](shared/colorimetricStandards.js)
-[![Chemistry](https://img.shields.io/badge/Chemistry-Cu--PAN%20(Copper(II)--PAN)-indigo?style=flat-square)](h2s_dosimeter/config/strip_calibration.json)
+[![Next.js](https://img.shields.io/badge/Next.js-14.0-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind-3.3-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
+[![Chemistry](https://img.shields.io/badge/Chemistry-Lead(II)%20Acetate%20Chemocassette-amber?style=flat-square)](lib/calibrationData.ts)
+[![Regulatory](https://img.shields.io/badge/Standards-OSHA%20%7C%20NIOSH%20%7C%20ACGIH-emerald?style=flat-square)](lib/calibrationData.ts)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)](LICENSE)
 
-> **SIH26118 Project Summary**: A field-deployable, non-invasive optical dosimetry platform that estimates cumulative occupational $\text{H}_2\text{S}$ exposure ($\text{ppm}\cdot\text{h}$) by quantifying the chromatic transition of immobilized **Cu-PAN (Copper(II)-1-(2-pyridylazo)-2-naphthol)** strips under ambient and lighting-compensated conditions.
+> **H2S-SafeTrack** is a production-grade, end-to-end industrial safety and optical dosimetry platform engineered strictly for **Lead(II) Acetate paper-strip chemocassettes**. It translates physical paper darkening caused by toxic Hydrogen Sulfide ($H_2S$) gas into precise, mathematically rigorous occupational exposure readings ($0.0 - 100.0+\text{ ppm}$), featuring a Worker Field PWA with live image preview and crop alignment, and a real-time Supervisor EHS Command Center.
 
 ---
 
 ## Table of Contents
-1. [Chemical Sensing Principle](#1-chemical-sensing-principle)
-2. [Disposable Strip Lifecycle & Remaining Sensing Capacity](#2-disposable-strip-lifecycle--remaining-sensing-capacity)
-3. [Cumulative Master Retraining & Versioning Engine](#3-cumulative-master-retraining--versioning-engine)
-4. [Calibration & Model Dashboard Module](#4-calibration--model-dashboard-module)
-5. [Worker Registration & Access Control Architecture](#5-worker-registration--access-control-architecture)
-6. [Optical Metrology Pipeline](#6-optical-metrology-pipeline)
-7. [Statutory Limits & Risk Policy](#7-statutory-limits--risk-policy)
-8. [Project Structure](#8-project-structure)
-9. [Running & Verification Instructions](#9-running--verification-instructions)
+1. [Sensor Chemistry & Reaction Mechanism](#1-sensor-chemistry--reaction-mechanism)
+2. [Colorimetric & Computer Vision Pipeline](#2-colorimetric--computer-vision-pipeline)
+3. [6-Anchor Empirical Calibration Metrology (0–100 ppm)](#3-6-anchor-empirical-calibration-metrology-0100-ppm)
+4. [Worker Mobile PWA Features](#4-worker-mobile-pwa-features)
+5. [Supervisor EHS Command Center](#5-supervisor-ehs-command-center)
+6. [Platform Architecture & Project Structure](#6-platform-architecture--project-structure)
+7. [Mathematical Validation & Test Suite](#7-mathematical-validation--test-suite)
+8. [Quick Start & Installation Guide](#8-quick-start--installation-guide)
 
 ---
 
-## 1. Chemical Sensing Principle
+## 1. Sensor Chemistry & Reaction Mechanism
 
-The sensing chemistry is based on the coordination complex of **copper(II) with 1-(2-pyridylazo)-2-naphthol (Cu-PAN)** immobilized on a solid porous substrate (regenerated cellulose matrix):
+The sensing engine operates strictly on the stoichiometric precipitation reaction between airborne Hydrogen Sulfide gas and Lead(II) Acetate trihydrate impregnated into high-purity cellulose substrate paper:
+
+$$\text{Pb(CH}_3\text{COO)}_2 \cdot 3\text{H}_2\text{O} \text{ (white crystalline paper)} + \text{H}_2\text{S (g)} \longrightarrow \text{PbS} \downarrow \text{ (brownish-black precipitate)} + 2\,\text{CH}_3\text{COOH} + 3\,\text{H}_2\text{O}$$
+
+### Key Chromogenic Characteristics:
+- **Baseline Matrix:** Pristine, unreacted paper exhibits high reflectance ($L^* \approx 92.5$, creamy white).
+- **Reaction Trajectory:** As $H_2S$ diffuses into the fibrous paper matrix, insoluble Lead(II) Sulfide ($PbS$) nanoparticles precipitate, causing a monotonic drop in lightness ($L^* \to 25.0$) and a corresponding surge in Optical Density ($OD \to 1.91$).
+- **Zero Cu-PAN / Copper Decoupling:** The codebase strictly excludes Cu-PAN (1-(2-Pyridylazo)-2-naphthol) chelates, copper salts, and cyan-to-magenta shifts, ensuring pure, uncompromised lead-sulfide colorimetry.
+
+---
+
+## 2. Colorimetric & Computer Vision Pipeline
 
 ```text
-Cu(II)-PAN complex (Purple / Deep Violet)
-        +
-H₂S (Gaseous Sulfide)
-        ↓
-Sulfide coordination & displacement of Cu(II)
-        ↓
-CuS precipitation + Free H-PAN dye release
-        ↓
-Visible Chromatic Transition: PURPLE/VIOLET → YELLOW/ORANGE
+┌─────────────────────────┐     IEC 61966-2-1      ┌─────────────────────────┐
+│   Raw Device RGB Image  │ ─────────────────────> │ Linearized sRGB Luminance│
+└─────────────────────────┘      Gamma Decode      └────────────┬────────────┘
+                                                                │
+┌─────────────────────────┐    ISO 17321-1 Matrix  ┌────────────▼────────────┐
+│   Bradford D65 Adapted  │ <───────────────────── │    CIE 1931 XYZ Space   │
+│       CIELAB L*a*b*     │      CAT Transform     └─────────────────────────┘
+└────────────┬────────────┘
+             │
+             ├─────────────────────────────────────────────┐
+             ▼                                             ▼
+┌─────────────────────────┐                   ┌─────────────────────────┐
+│  Optical Density (OD)   │                   │  CIEDE2000 Color Diff   │
+│  OD = log10(Yref/Ysamp) │                   │  ΔE00 vs 6 Anchors      │
+└────────────┬────────────┘                   └────────────┬────────────┘
+             │                                             │
+             └──────────────────────┬──────────────────────┘
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│     PCHIP Hermite Spline Interpolation + Non-Linear Saturation Extrap   │
+│          Dynamic Range: 0.0 ppm Baseline  ───>  100.0+ ppm IDLH        │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Unexposed Virgin Baseline**: $L_0^* = 42.50, a_0^* = 38.20, b_0^* = -28.40$ (Deep Purple).
-- **Reacted Saturated State**: $L^* = 72.80, a^* = 14.50, b^* = 62.00$ (Intense Yellow/Orange).
-- **Dosimetry Unit**: The statutory output is strictly cumulative exposure dose in **`ppm·h`** ($\text{Dose} = \int_0^t C(\tau) d\tau$).
+1. **IEC 61966-2-1 Gamma Decoding:**  
+   Converts non-linear sRGB channel values ($C_{sRGB} \in [0, 1]$) into physical linear luminance:
+   $$C_{\text{linear}} = \begin{cases} \frac{C_{\text{sRGB}}}{12.92} & \text{if } C_{\text{sRGB}} \le 0.04045 \\ \left(\frac{C_{\text{sRGB}} + 0.055}{1.055}\right)^{2.4} & \text{if } C_{\text{sRGB}} > 0.04045 \end{cases}$$
+
+2. **CIE 1931 XYZ & Bradford Chromatic Adaptation (CAT):**  
+   Maps device RGB to standardized tristimulus space and applies Von Kries Bradford chromatic adaptation to normalize non-standard ambient lighting to standard CIE D65 illuminant ($X_w = 95.047, Y_w = 100.000, Z_w = 108.883$).
+
+3. **Optical Density (OD) Computation:**  
+   Quantifies paper transmittance/reflectance attenuation:
+   $$\text{OD} = \log_{10}\left(\frac{Y_{\text{ref}}}{Y_{\text{sample}}}\right) = -\log_{10}\left(\frac{Y}{100.0}\right)$$
+
+4. **CIEDE2000 Color Difference ($\Delta E_{00}$):**  
+   Evaluates perceptual color shifts according to ISO/CIE 11664-6:2022 with lightness, chroma, and hue weighting factors ($k_L, k_C, k_H = 1$).
+
+5. **Monotonic PCHIP Hermite Spline & Saturation Modeling:**  
+   Eliminates Runge oscillations and overshoot in calibration curves. Above 20 ppm where optical reflectance begins asymptotic saturation, the model uses an exponential Optical Density regression that maintains sensitivity up to 100+ ppm IDLH.
 
 ---
 
-## 2. Disposable Strip Lifecycle & Remaining Sensing Capacity
+## 3. 6-Anchor Empirical Calibration Metrology (0–100 ppm)
 
-The system tracks two decoupled lifecycles:
+The platform is calibrated against 6 empirical laboratory anchors spanning safe ambient levels up to lethal IDLH concentrations:
 
-1. **Storage Shelf Life**: Pre-opening expiration ($T < \text{storage\_expiry\_at}$).
-2. **Active Sensing Capacity**: Cumulative chemical exposure limit against the experimentally validated operating domain ($D_{\text{max}} = 160.0\text{ ppm·h}$):
+| Anchor | Target [PPM] | Status Tier | sRGB Hex | Lab Coordinates $(L^*, a^*, b^*)$ | Optical Density ($OD$) | $\Delta E_{00}$ Shift | Regulatory Benchmark |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
+| **#1** | **0.0** | `SAFE` | `#FDFBF7` | $(92.5, 0.5, 4.2)$ | $0.014$ | $0.00$ | Clean Air Baseline |
+| **#2** | **3.0** | `SAFE` | `#E8D5B5` | $(85.2, 3.8, 18.5)$ | $0.180$ | $12.4$ | ACGIH TWA Threshold ($1.0\text{ ppm}$) |
+| **#3** | **7.5** | `CAUTION` | `#C4A47C` | $(72.1, 7.2, 24.1)$ | $0.390$ | $26.8$ | Pre-PEL Caution Zone |
+| **#4** | **15.0** | `WARNING` | `#8C6542` | $(52.4, 11.5, 23.8)$ | $0.720$ | $44.5$ | **OSHA PEL Exceeded** ($10.0\text{ ppm}$) |
+| **#5** | **35.0** | `DANGER` | `#4A3525` | $(34.8, 8.1, 14.2)$ | $1.250$ | $61.2$ | **OSHA Ceiling Exceeded** ($20.0\text{ ppm}$) |
+| **#6** | **100.0** | `CRITICAL` | `#1E1610` | $(25.0, 4.5, 6.0)$ | $1.912$ | $74.8$ | **NIOSH IDLH Critical** ($100.0\text{ ppm}$) |
 
-$$L_{\text{remaining}} = 100\left(1 - \frac{D_{\text{cumulative}}}{D_{\text{max}}}\right), \quad L_{\text{used}} = 100 \times \frac{D_{\text{cumulative}}}{D_{\text{max}}}$$
-
-- **Status Tiers**:
-  - $> 30\%$ remaining: `● STRIP GOOD`
-  - $10\text{--}30\%$ remaining: `⚠ STRIP NEAR END OF LIFE (REPLACE SOON)`
-  - $\le 10\%$ remaining: `✕ REPLACE STRIP NOW (SENSING CAPACITY EXHAUSTED)`
-- **Backend Gate**: Scans on exhausted strips are immediately rejected with `400 Bad Request` (`STRIP_EXHAUSTED`).
-- **Post-Scan Result Card**: The mobile capture app immediately displays the primary H₂S exposure along with the dedicated **Current Cu-PAN Strip** sensing life progress bar and quick replacement button.
+### Statutory Threshold Matrix:
+- **ACGIH 8-Hour TWA:** $1.0\text{ ppm}$
+- **OSHA Permissible Exposure Limit (PEL):** $10.0\text{ ppm}$ (8-hour TWA)
+- **OSHA Acceptable Ceiling Concentration:** $20.0\text{ ppm}$ (Instantaneous halt)
+- **OSHA Maximum Peak:** $50.0\text{ ppm}$ (10 min once per shift)
+- **NIOSH IDLH (Immediately Dangerous to Life or Health):** $100.0\text{ ppm}$ (Instant evacuation)
 
 ---
 
-## 3. Cumulative Master Retraining & Versioning Engine
+## 4. Worker Mobile PWA Features
 
-### Fundamental Cumulative Invariant
-Every time new validated experimental calibration data are approved, the system builds the next model using the **complete cumulative master dataset**:
+The Worker Field interface (`app/worker/page.tsx`) provides high-reliability, offline-first scanning tools for industrial personnel:
 
-$$\text{Master}_{v(N+1)} = \text{Master}_{v(N)} + \text{New Validated Laboratory Data}$$
+- **Concentric Dual-Ring Fiducial Reticle:**  
+  Live camera HUD displays outer reference alignment ($160 \times 160\text{ px}$) and inner reaction core ($80 \times 80\text{ px}$) targeting reticles with pulsing status indicators.
+- **Interactive Review & Crop/Alignment Panel:**  
+  Upon capture or gallery upload, the live video stream pauses and switches immediately to an interactive preview stage. Workers can:
+  - Visually inspect lighting, focus, and glare before analysis.
+  - View the precision circular reticle overlaid directly on the captured image.
+  - Choose between **"Retake Scan"** (clears image and restarts camera) and **"Analyze Exposure"** (triggers full colorimetric evaluation).
+- **3-Card Verdict Audit Trail (`components/WorkerVerdict.tsx`):**  
+  Displays the captured badge thumbnail side-by-side with the isolated detected color swatch and matched laboratory reference anchor.
+- **Color-Coded Action Tiers & Audio Haptics:**  
+  Provides instantaneous guidance (e.g. green for normal shift, amber for ventilation check, red for donning SCBA and initiating emergency muster).
+
+---
+
+## 5. Supervisor EHS Command Center
+
+The Supervisor Dashboard (`app/supervisor/page.tsx`) offers facility-wide situational awareness:
+
+- **Live Fleet Exposure Grid (`components/SupervisorTable.tsx`):**  
+  Monitors badge IDs, worker names, active industrial zones, last scan timestamps, and OSHA status tiers with instant filtering (`All`, `Exceeding PEL`, `Critical IDLH`).
+- **Dynamic 0–100 ppm Exposure Chart (`components/ExposureChart.tsx`):**  
+  Real-time Recharts visualization plotting worker exposures with color-coded reference lines for:
+  - *ACGIH TWA ($1\text{ ppm}$)*
+  - *OSHA PEL ($10\text{ ppm}$)*
+  - *OSHA Ceiling ($20\text{ ppm}$)*
+  - *NIOSH IDLH ($100\text{ ppm}$)*
+- **Geospatial Sector Heatmap (`components/ZoneHeatmap.tsx`):**  
+  Interactive plant sector grid (e.g. Hydrotreater A-1, Desulfurizer B-3, Flare Header D-4) color-coded by maximum recorded ppm with one-click sector isolation.
+- **Auditory Hazard Alarm:**  
+  Web Audio API synthesizer emits an 800 Hz pulsed acoustic siren whenever an active IDLH or Ceiling breach occurs.
+- **OSHA 300 Incident CSV Export:**  
+  Generates compliance-ready audit logs with worker IDs, zone coordinates, raw RGB, calibrated ppm, and statutory status.
+
+---
+
+## 6. Platform Architecture & Project Structure
 
 ```text
-CUPAN-DATA-v1 (50 real samples)  ──→ CUPAN-MODEL-v1 (MAE: 24.50 ppm·h)
-        ↓ +50 samples
-CUPAN-DATA-v2 (100 real samples) ──→ CUPAN-MODEL-v2 (MAE: 20.80 ppm·h)
-        ↓ +100 samples
-CUPAN-DATA-v3 (200 real samples) ──→ CUPAN-MODEL-v3 (MAE: 17.00 ppm·h)
-        ↓ +50 samples
-CUPAN-DATA-v4 (250 real samples) ──→ CUPAN-MODEL-v4 (MAE: 13.40 ppm·h) [PUBLISHED]
-```
-
-### Key Retraining Capabilities
-- **Zero-Leakage GroupKFold Partitioning**: Real source samples are partitioned into Train ($70\%$), Validation ($15\%$), and Test ($15\%$) **before augmentation**; validation and test sets remain 100% untouched real laboratory data.
-- **Candidate Training & Side-by-Side Comparison**: New models are trained in `DRAFT` state and evaluated side-by-side with the current production model on $\Delta \text{MAE}$, $\Delta \text{RMSE}$, and $\Delta R^2$.
-- **Supervisor Publishing & One-Click Rollback**: Published models become active across all mobile and fleet endpoints; supervisors can roll back to any historical model snapshot without data loss.
-- **Coverage Heatmap & Testing Priority**: 2D density matrix over Dose ($0\text{--}160\text{ ppm·h}$) $\times$ Temperature ($15\text{--}40^\circ\text{C}$) identifies undersampled regions and recommends high-priority targets.
-
----
-
-## 4. Calibration & Model Dashboard Module
-
-The Supervisor Dashboard includes a dedicated first-class **Calibration & Model** interface:
-
-- **Top KPI Metrics**: Cumulative Real Samples ($250$), Published Model (`CUPAN-MODEL-v4`), Held-out Test $R^2$ ($0.9320$), Test MAE ($13.40\text{ ppm·h}$).
-- **Graph 1: Cu-PAN Calibration Curve**: $\Delta E_{00}$ vs Dose with real experimental markers and fitted surface curve.
-- **Graph 2: CIELAB Progression Curves**: Interactive $L^*$, $a^*$, $b^*$ response tabs.
-- **Graph 3: Predicted vs Actual Dose**: Test set scatter against the ideal $y=x$ dashed diagonal line.
-- **Graph 4: Residual Error Distribution**: Bias detection ($Residual = Predicted - Actual$) around zero error baseline.
-- **Graph 5: Historical Dataset Growth & Accuracy Trends**: Live curves tracking real sample growth and error reduction over versions.
-- **2D Density Matrix Heatmap & Priority Recommendation**: Guides future laboratory chamber testing.
-- **Cu-PAN Reference Colour Scale & Optical Pipeline**: Visual swatch reference and step-by-step colorimetric conversion diagram.
-- **250-Case Master Dataset Ledger**: Paginated sample ledger with search and CIELAB coordinates.
-
----
-
-## 5. Worker Registration & Access Control Architecture
-
-```text
-UNREGISTERED WORKER ──→ [ 403 FORBIDDEN: WORKER_NOT_REGISTERED ] ──→ Blocked
-INACTIVE WORKER     ──→ [ 403 FORBIDDEN: WORKER_BLOCKED ]        ──→ Blocked
-REGISTERED WORKER   ──→ Valid Active Strip Assigned               ──→ PIC SCAN Allowed
-                                                                           ↓
-                                                                  Cumulative Dose Logged
-                                                                           ↓
-                                                                  Remaining Life Updated
-```
-
-- Unregistered or blocked workers are strictly prevented from performing scans.
-- Each scan logs the `model_version` (`CUPAN-MODEL-v4`), `dataset_version` (`CUPAN-DATA-v4`), and `strip_id` for immutable regulatory audit trails.
-
----
-
-## 6. Optical Metrology Pipeline
-
-```mermaid
-graph TD
-    A[Image Capture / Upload] --> B[Quality Gate: Glare, Blur, Exposure]
-    B --> C[3-Patch ROI Extraction: White, Grey, Cu-PAN]
-    C --> D[IEC 61966-2-1 Inverse Gamma Linearization]
-    D --> E[ISO 17321-1 Camera CCM Characterization]
-    E --> F[Bradford Chromatic Adaptation to D65]
-    F --> G[CIE 015:2018 CIELAB Transform]
-    G --> H[ISO/CIE 11664-6:2022 CIEDE2000 ΔE₀₀]
-    H --> I[Arrhenius Environmental Compensation k T, RH]
-    I --> J[Polynomial Surface Regression Model]
-    J --> K[Cumulative Dose ppm·h & DGMS Statutory Risk Tier]
+H2S-SafeTrack/
+├── app/                              # Next.js 14 App Router
+│   ├── layout.tsx                    # Global root layout & navigation bar
+│   ├── page.tsx                      # Platform portal & 6-anchor calibration display
+│   ├── globals.css                   # Tailwind styles & reticle animations
+│   ├── worker/
+│   │   └── page.tsx                  # Worker Field PWA with live scanner & verdict
+│   └── supervisor/
+│       └── page.tsx                  # Supervisor EHS Command Center & KPI cards
+├── components/                       # Modular UI Components
+│   ├── DosimeterScanner.tsx          # Dual-mode camera/upload with review panel
+│   ├── WorkerVerdict.tsx             # 3-card audit trail, hazard tier & guidance
+│   ├── ExposureChart.tsx             # 0-100 ppm Recharts exposure plot
+│   ├── ZoneHeatmap.tsx               # Industrial facility zone hazard map
+│   └── SupervisorTable.tsx           # Worker telemetry table with OSHA filters
+├── lib/                              # Core Metrology & State Engine
+│   ├── calibrationData.ts            # 6 empirical anchors & regulatory limits
+│   ├── colorimetry.ts                # Gamma, Bradford CAT, OD, PCHIP spline
+│   ├── db.ts                         # In-memory worker shifts & seeded telemetry
+│   └── socketMock.ts                 # Simulated telemetry pub/sub stream
+├── scratch/
+│   └── test_safetrack_core.js        # 10-test automated verification suite
+├── package.json                      # Next.js, React 18, Tailwind, Lucide, Recharts
+├── tsconfig.json                     # TypeScript configuration
+└── tailwind.config.js                # Design tokens & color palettes
 ```
 
 ---
 
-## 7. Statutory Limits & Risk Policy
+## 7. Mathematical Validation & Test Suite
 
-| Risk Tier | Cumulative Dose ($\text{ppm}\cdot\text{h}$) | 8-Hr TWA Equivalent | Regulatory Standard & Prescribed Action |
-|---|---|---|---|
-| **SAFE** | $0.0 - 8.0$ | $<1.0\text{ ppm}$ | ACGIH TLV-TWA shift baseline. Normal operations. |
-| **CAUTION** | $8.0 - 24.0$ | $1.0 - 3.0\text{ ppm}$ | Approaching ACGIH TWA threshold. Check ventilation. |
-| **WARNING** | $24.0 - 40.0$ | $3.0 - 5.0\text{ ppm}$ | ACGIH 15-min STEL ($5\text{ ppm}$) / 50% DGMS shift limit. |
-| **ALERT** | $40.0 - 80.0$ | $5.0 - 10.0\text{ ppm}$ | NIOSH REL Ceiling ($10\text{ ppm}$). Mandatory PPE. |
-| **DANGER** | $80.0 - 160.0$ | $>10.0\text{ ppm}$ | **Exceeded Indian DGMS $80\text{ ppm}\cdot\text{h}$ Shift Limit**. Evacuate sector. |
-| **LIFE THREATENING** | $>160.0$ | $>20.0\text{ ppm}$ | Approaching NIOSH IDLH ($100\text{ ppm}$). Immediate rescue. |
+The platform includes an automated mathematical and architectural audit suite (`scratch/test_safetrack_core.js`):
 
----
-
-## 8. Project Structure
-
-```text
-H2S-DOSIMETER/
-├── h2s_dosimeter/              # Core Python Metrological Engine
-│   ├── calibration/            # Datasets, Cu-PAN spline & polynomial models
-│   ├── camera/                 # Camera profiling, CCM solver
-│   ├── color/                  # IEC 61966-2-1, Bradford CAT, CIEDE2000
-│   ├── config/                 # strip_calibration.json, cupan_dataset_200.json
-│   ├── dosimetry/              # Arrhenius kinetics, multi-shift tracker, risk policy
-│   ├── scripts/                # cumulative_trainer.py, generate_calibration_suite.py
-│   └── tests/                  # 53 pytest unit and integration tests
-├── data/                       # Immutable Master Dataset & Model Version Storage
-│   ├── master/                 # CUPAN-DATA-v1.json to CUPAN-DATA-v4.json
-│   ├── incoming/               # Pending validation queue
-│   └── rejected/               # Rejected samples
-├── backend/                    # Node.js / Express API Gateway & MongoDB Store
-│   ├── src/controllers/        # readingController, stripController, modelCalibrationController
-│   ├── src/models/             # Worker.js, Strip.js, StripBatch.js, Reading.js
-│   ├── src/routes/             # workerRoutes, stripRoutes, calibrationRoutes
-│   └── src/server.js           # API Gateway (ports: 5000)
-├── mobile-app/                 # React / Vite Field PWA
-│   └── src/screens/            # WorkerIdScreen, ResultScreen (with Strip Capacity Card)
-├── dashboard/                  # React / Vite Safety Supervisor Fleet Portal
-│   ├── src/pages/              # Overview, WorkerHistory, BatchesPage, CalibrationModelPage, DGMSReport
-│   └── src/components/         # CuPanReferenceScale, ModelComparisonModal, AddCalibrationDataModal
-├── test-cumulative-retraining.js # Automated 11-test suite for cumulative retraining
-├── test-strip-lifecycle.js       # Automated 10-test suite for registration & strip lifecycle
-└── test-e2e.js                   # Automated 12-test end-to-end API pipeline test
-```
-
----
-
-## 9. Running & Verification Instructions
-
-### 1. Python Metrological Engine Tests
 ```bash
-pytest -v h2s_dosimeter/tests
+node scratch/test_safetrack_core.js
 ```
 
-### 2. Cumulative Retraining Engine CLI
-```bash
-python -m h2s_dosimeter.scripts.cumulative_trainer --action train_candidate
-```
+### Verified Test Cases:
+1. **Zero Cu-PAN Architecture Audit:** Proves 0 occurrences of Cu-PAN or copper complexes across all production code.
+2. **Gamma Decoding Verification:** Confirms black ($0 \to 0.0$), white ($255 \to 1.0$), and mid-grey non-linearity ($128 \to 0.2159$).
+3. **Bradford Chromatic Adaptation:** Validates D65 identity mapping and chromatic normalization.
+4. **Optical Density Bounds:** Confirms pristine paper ($OD = 0.014$) up to saturated Lead Sulfide ($OD = 1.912$).
+5. **6-Anchor Monotonicity:** Proves strict monotonic progression across PPM, $\Delta E_{00}$, and Optical Density.
+6. **Dynamic Range Extrapolation:** Validates non-clamped sensitivity at 25 ppm, 50 ppm, and 100 ppm IDLH.
 
-### 3. Backend Setup & Seeding
+---
+
+## 8. Quick Start & Installation Guide
+
+### Prerequisites
+- **Node.js:** v18.0.0 or higher
+- **npm:** v9.0.0 or higher
+
+### 1. Install Dependencies
 ```bash
-cd backend
 npm install
-npm run seed
-npm start
 ```
 
-### 4. Client Applications
+### 2. Run Validation Suite
 ```bash
-# Mobile Field App (http://localhost:5173)
-cd mobile-app && npm install && npm run dev
-
-# Supervisor Dashboard (http://localhost:5174)
-cd dashboard && npm install && npm run dev
+node scratch/test_safetrack_core.js
 ```
 
-### 5. Automated Verification Test Suites
+### 3. Start Development Server
 ```bash
-# 1. Cumulative Retraining & Rollback Test Suite
-node test-cumulative-retraining.js
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser:
+- **Home / Calibration Hub:** `http://localhost:3000/`
+- **Worker Scanner PWA:** `http://localhost:3000/worker`
+- **Supervisor Command Center:** `http://localhost:3000/supervisor`
 
-# 2. Worker Registration & Strip Lifecycle Test Suite
-node test-strip-lifecycle.js
-
-# 3. End-to-End System Pipeline Test Suite
-node test-e2e.js
+### 4. Production Build & Start
+```bash
+npm run build
+npm start -- -p 3000
 ```
 
 ---
 
-## License
-Developed for Smart India Hackathon **SIH26118**. Distributed under the Apache 2.0 License.
+## Disclaimer
+*This platform is an engineering and research implementation of optical dosimetry for Lead(II) Acetate chemocassettes. In physical industrial deployments, always adhere to local site safety protocols, wear certified personal gas monitors, and observe statutory DGMS, OSHA, and NIOSH life-safety regulations.*

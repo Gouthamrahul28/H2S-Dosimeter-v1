@@ -252,13 +252,11 @@ export async function getWorkerCumulativeDose(workerId) {
  */
 export async function submitReading(payload) {
   const fullPayload = {
-    chemistry: 'Cu-PAN',
-    stripBatch: 'CUPAN-BATCH-001',
     cameraProfile: 'mobile_001',
     ...payload
   };
 
-  console.log("SCAN API:", `${getApiBaseUrl()}/scan`, "Payload worker:", fullPayload.workerId);
+  console.log("SCAN API:", `${getApiBaseUrl()}/scan`, "Payload worker:", fullPayload.workerId, "chemistry:", fullPayload.chemistry);
   try {
     return await request('/scan', {
       method: 'POST',
@@ -268,22 +266,24 @@ export async function submitReading(payload) {
     if (err.code === 'NETWORK_ERROR' || !navigator.onLine) {
       console.warn('[Offline Mode] Network unavailable. Enqueuing reading locally.');
       enqueueOfflineReading(fullPayload);
+      const isLead = fullPayload.chemistry === 'LEAD_ACETATE';
       return {
         _isOfflineQueued: true,
-        chemistry: 'Cu-PAN',
-        unit: 'ppm·h',
+        chemistry: fullPayload.chemistry || 'CU_PAN',
+        sensor_chemistry: fullPayload.chemistry || 'CU_PAN',
+        unit: isLead ? 'mL_H2S' : 'ppm·h',
         workerId: fullPayload.workerId,
         shiftId: fullPayload.shiftId,
-        estimatedDosePpmHours: 0.0,
-        dose: 0.0,
-        confidence: 0.94,
-        calibrationStatus: 'VALID',
+        estimatedDosePpmHours: null,
+        dose: null,
+        confidence: null,
+        calibrationStatus: 'OFFLINE_PENDING_SYNC',
         qualityStatus: 'QUEUED_OFFLINE',
-        qualityScore: 90,
-        alertLevel: 'SAFE',
-        alertColor: '#10b981',
-        alertBadgeClass: 'safe',
-        alertNote: 'Reading saved to local device queue. Will auto-sync when network is restored.',
+        qualityScore: null,
+        alertLevel: 'OFFLINE_PENDING_SYNC',
+        alertColor: '#94a3b8',
+        alertBadgeClass: 'pending',
+        alertNote: 'Reading saved to local device queue. Exposure dose will be computed upon network synchronization.',
         createdAt: new Date().toISOString()
       };
     }

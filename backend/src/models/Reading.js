@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeChemistryId } = require('../../../shared/chemistryRegistry.cjs');
 
 const ReadingSchema = new mongoose.Schema(
   {
@@ -43,8 +44,10 @@ const ReadingSchema = new mongoose.Schema(
     },
     chemistry: {
       type: String,
-      default: 'Cu-PAN',
-      required: true
+      default: 'CU_PAN',
+      required: true,
+      index: true,
+      set: (v) => normalizeChemistryId(v) || v
     },
     stripBatch: {
       type: String,
@@ -90,8 +93,23 @@ const ReadingSchema = new mongoose.Schema(
     },
     calibrationStatus: {
       type: String,
-      enum: ['VALID', 'OUTSIDE CALIBRATION RANGE', 'NOT_CALIBRATED'],
+      enum: [
+        'VALID',
+        'OUTSIDE CALIBRATION RANGE',
+        'NOT_CALIBRATED',
+        'CALIBRATION_UNAVAILABLE',
+        'IMAGE_PROCESSING_FAILED',
+        'IMAGE_QUALITY_FAILED',
+        'MODEL_UNAVAILABLE',
+        'INVALID_COLOR_DATA',
+        'OFFLINE_PENDING_SYNC',
+        'VALID_ESTIMATE'
+      ],
       default: 'VALID'
+    },
+    isVirginBaseline: {
+      type: Boolean,
+      default: false
     },
     expiryPatchStatus: {
       type: String,
@@ -108,7 +126,8 @@ const ReadingSchema = new mongoose.Schema(
     },
     estimatedDosePpmHours: {
       type: Number,
-      required: true
+      required: false,
+      default: null
     },
     calibrationCurveVersion: {
       type: String,

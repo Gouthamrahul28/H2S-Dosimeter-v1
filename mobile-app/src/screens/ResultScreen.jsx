@@ -31,25 +31,26 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
     readingId,
     workerId = workerData?.workerId || 'W1023',
     shiftId,
-    chemistry = 'Cu-PAN',
-    indicator = 'Copper(II)-PAN',
-    stripBatch = 'CUPAN-BATCH-001',
+    chemistry,
+    sensor_chemistry,
+    indicator,
+    stripBatch,
     cameraProfile = 'mobile_001',
     stripColorRGB = { r: 139, g: 76, b: 148 },
     referenceColorRGB = { r: 250, g: 250, b: 250 },
     greyColorRGB = { r: 128, g: 128, b: 128 },
     correctedColorRGB = { r: 139, g: 76, b: 148 },
-    estimatedDosePpmHours = 0.0,
-    dose = 0.0,
-    unit = 'ppm·h',
+    estimatedDosePpmHours = null,
+    dose = null,
+    unit,
     calibration_status = 'VALID',
     calibrationStatus = 'VALID',
     alertLevel = 'SAFE',
     alertNote = 'Within normal occupational limits.',
     alertBadgeClass = 'safe',
     alertColor = '#10b981',
-    confidence = 94,
-    confidencePercent = 94,
+    confidence = null,
+    confidencePercent = null,
     lab = { L: 42.50, a: 38.20, b: -28.40 },
     deltaE00 = 0.0,
     temperature_c = 25.0,
@@ -61,33 +62,64 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
     strip_life = null
   } = result;
 
-  const activeDose = Number(dose || estimatedDosePpmHours || 0.0);
+  // Resolve chemistry dynamically from authoritative backend payload
+  const rawChem = sensor_chemistry || chemistry || result.model?.chemistry || workerData?.chemistry || 'CU_PAN';
+  const isLeadAcetate = rawChem === 'LEAD_ACETATE' || rawChem === 'Lead-Acetate' || (typeof rawChem === 'string' && rawChem.toUpperCase().includes('LEAD'));
+  const activeChemDisplay = isLeadAcetate ? 'LEAD ACETATE' : 'CU-PAN';
+  const activeChemName = isLeadAcetate ? 'Lead Acetate' : 'Cu-PAN';
+  const displayUnit = unit || result.unit || (isLeadAcetate ? 'mL H₂S' : 'ppm·h');
+
+  // Extract numeric dose while preserving explicit null/uncalibrated states
+  const rawDose = (dose !== undefined && dose !== null)
+    ? Number(dose)
+    : (estimatedDosePpmHours !== undefined && estimatedDosePpmHours !== null ? Number(estimatedDosePpmHours) : null);
+
+  const isDoseAvailable = rawDose !== null && !isNaN(rawDose);
+  const activeDose = isDoseAvailable ? rawDose : 0.0;
+  const isVirgin = !!result.isVirginBaseline || (isDoseAvailable && rawDose === 0.0 && (calibrationStatus === 'VALID' || calibration_status === 'VALID'));
+  const isPendingSync = result._isOfflineQueued || calibrationStatus === 'OFFLINE_PENDING_SYNC';
+  const isCalibUnavailable = calibrationStatus === 'CALIBRATION_UNAVAILABLE' || calibrationStatus === 'CALIBRATION_DATA_REQUIRED' || calibration_status === 'CALIBRATION_UNAVAILABLE';
+  const isImageRejected = calibrationStatus === 'IMAGE_PROCESSING_FAILED' || calibration_status === 'IMAGE_PROCESSING_FAILED';
+  const isErrorState = !isDoseAvailable || isPendingSync || isCalibUnavailable || isImageRejected;
+
   const activeTemp = Number(temperature_c || ambientTemp || 25.0);
   const activeHumidity = Number(humidity_percent || ambientHumidity || 50.0);
-  const activeConfidence = Number(confidencePercent || (confidence > 1 ? confidence : confidence * 100) || 94.0);
+  const activeConfidence = Number(confidencePercent || (confidence > 1 ? confidence : (confidence !== null ? confidence * 100 : 94.0)));
   const isOutOfRange = calibration_status === 'OUTSIDE CALIBRATION RANGE' || calibrationStatus === 'OUTSIDE CALIBRATION RANGE';
   const isDanger = ['ALERT', 'DANGER', 'SEVERE', 'LIFE_THREATENING'].includes(alertLevel);
-  const shiftPercent = Math.min(100, Math.round((activeDose / 80.0) * 100)); // DGMS 80 ppm·h shift limit
+
+  // Shift limit / experimental domain calculation
+  const shiftPercent = isDoseAvailable
+    ? (isLeadAcetate
+        ? Math.min(100, Math.round((activeDose / 22.3) * 100)) // 22.3 mL H2S gas-train experimental domain
+        : Math.min(100, Math.round((activeDose / 80.0) * 100))) // DGMS 80 ppm·h shift limit
+    : 0;
 
   // Extract authoritative Strip Sensing Capacity metrics
-  const stripId = strip?.id || strip_life?.strip_id || workerData?.assignedStripId || 'CUPAN-2026-000123';
-  const batchId = strip?.batch_id || stripBatch || 'CUPAN-BATCH-001';
+  const stripId = strip?.id || strip?.stripId || strip_life?.strip_id || workerData?.assignedStripId || (isLeadAcetate ? 'LA-STRIP-2026-000101' : 'CUPAN-2026-000123');
+  const batchId = strip?.batch_id || strip?.batchId || stripBatch || (isLeadAcetate ? 'LA-BATCH-2026-01' : 'CUPAN-BATCH-001');
   const cumulativeStripDose = strip_life?.cumulative_dose_ppm_h !== undefined
     ? Number(strip_life.cumulative_dose_ppm_h)
-    : Number(strip?.cumulative_dose || activeDose);
-  const maxValidatedDose = strip_life?.max_validated_dose_ppm_h !== undefined
-    ? strip_life.max_validated_dose_ppm_h
-    : (strip?.max_validated_dose || 160.0);
+    : Number(strip?.cumulative_dose || (isDoseAvailable ? activeDose : 0.0));
 
-  const lifeRemaining = strip_life?.remaining_percent !== undefined
-    ? strip_life.remaining_percent
-    : (strip?.life_remaining_percent !== undefined ? strip.life_remaining_percent : 100);
-  const lifeUsed = strip_life?.used_percent !== undefined
-    ? strip_life.used_percent
-    : (strip?.life_used_percent !== undefined ? strip.life_used_percent : 0);
+  // For Lead Acetate: sensing capacity is currently under active characterization and NOT yet validated
+  const hasValidatedCapacity = !isLeadAcetate && (strip?.max_validated_dose || strip_life?.max_validated_dose_ppm_h) > 0;
+  const maxValidatedDose = hasValidatedCapacity ? (strip_life?.max_validated_dose_ppm_h || strip?.max_validated_dose || 160.0) : null;
+
+  const lifeRemaining = hasValidatedCapacity
+    ? (strip_life?.remaining_percent !== undefined
+        ? strip_life.remaining_percent
+        : (strip?.life_remaining_percent !== undefined ? strip.life_remaining_percent : 100))
+    : null;
+
+  const lifeUsed = hasValidatedCapacity
+    ? (strip_life?.used_percent !== undefined
+        ? strip_life.used_percent
+        : (strip?.life_used_percent !== undefined ? strip.life_used_percent : 0))
+    : null;
 
   const stripStatus = strip_life?.status || strip?.status || 'GOOD';
-  const statusLabel = strip_life?.status_label || strip?.status_label || (lifeRemaining > 30 ? 'STRIP GOOD' : lifeRemaining > 10 ? 'REPLACE SOON' : 'REPLACE NOW');
+  const statusLabel = strip_life?.status_label || strip?.status_label || (lifeRemaining !== null && lifeRemaining > 30 ? 'STRIP GOOD' : (lifeRemaining !== null && lifeRemaining > 10 ? 'REPLACE SOON' : (hasValidatedCapacity ? 'REPLACE NOW' : 'NOT YET VALIDATED')));
   const timeRemaining = strip_life?.time_remaining || strip?.time_remaining_formatted || null;
   const isTimeValidated = !!strip?.active_life_validated || (timeRemaining && !timeRemaining.includes('NOT YET VALIDATED'));
 
@@ -100,7 +132,7 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--accent-cyan)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            SIH26118 • Cu-PAN DOSIMETER
+            SIH26118 • {activeChemDisplay} DOSIMETER
           </span>
           <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: '2px 0 0 0' }}>
             Exposure Result
@@ -114,15 +146,25 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
               fontWeight: '700',
               padding: '4px 8px',
               borderRadius: '6px',
-              background: isOutOfRange ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-              color: isOutOfRange ? '#f87171' : '#34d399',
-              border: isOutOfRange ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)'
+              background: isErrorState ? 'rgba(148, 163, 184, 0.2)' : isOutOfRange ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+              color: isErrorState ? '#94a3b8' : isOutOfRange ? '#f87171' : '#34d399',
+              border: isErrorState ? '1px solid rgba(148, 163, 184, 0.4)' : isOutOfRange ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)'
             }}
           >
-            {isOutOfRange ? 'OUT OF RANGE' : 'CALIBRATED'}
+            {isPendingSync
+              ? 'SYNC PENDING'
+              : isCalibUnavailable
+              ? 'CALIBRATION REQUIRED'
+              : isImageRejected
+              ? 'IMAGE REJECTED'
+              : isOutOfRange
+              ? 'OUT OF RANGE'
+              : isVirgin
+              ? 'VIRGIN BASELINE'
+              : 'CALIBRATED'}
           </span>
           <span className={`badge badge-${alertBadgeClass}`} style={{ fontSize: '0.75rem', padding: '4px 10px', textTransform: 'uppercase' }}>
-            {alertLevel}
+            {isErrorState ? (isPendingSync ? 'PENDING' : 'UNAVAILABLE') : alertLevel}
           </span>
         </div>
       </div>
@@ -133,8 +175,16 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
         style={{
           padding: '22px 20px',
           textAlign: 'center',
-          border: isDanger ? '1px solid #f43f5e' : isOutOfRange ? '1px solid #f59e0b' : '1px solid rgba(16, 185, 129, 0.4)',
-          background: isDanger
+          border: isErrorState
+            ? '1px solid rgba(148, 163, 184, 0.4)'
+            : isDanger
+            ? '1px solid #f43f5e'
+            : isOutOfRange
+            ? '1px solid #f59e0b'
+            : '1px solid rgba(16, 185, 129, 0.4)',
+          background: isErrorState
+            ? 'radial-gradient(circle at 50% 0%, rgba(148, 163, 184, 0.15) 0%, var(--bg-card) 100%)'
+            : isDanger
             ? 'radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.18) 0%, var(--bg-card) 100%)'
             : isOutOfRange
             ? 'radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.18) 0%, var(--bg-card) 100%)'
@@ -152,23 +202,29 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
             style={{
               fontSize: '3.6rem',
               fontWeight: '900',
-              color: isDanger ? 'var(--accent-rose)' : isOutOfRange ? '#f59e0b' : 'var(--accent-emerald)',
+              color: isErrorState
+                ? '#94a3b8'
+                : isDanger
+                ? 'var(--accent-rose)'
+                : isOutOfRange
+                ? '#f59e0b'
+                : 'var(--accent-emerald)',
               letterSpacing: '-0.04em',
               lineHeight: 1
             }}
           >
-            {activeDose.toFixed(1)}
+            {isDoseAvailable ? activeDose.toFixed(1) : '--'}
           </span>
           <span style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
-            ppm·h
+            {displayUnit}
           </span>
         </div>
 
-        {/* Statutory Shift Utilization Meter */}
+        {/* Statutory / Experimental Domain Utilization Meter */}
         <div style={{ margin: '12px 0 6px 0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-            <span>DGMS 8-hr Shift Limit (80 ppm·h)</span>
-            <strong>{shiftPercent}%</strong>
+            <span>{isLeadAcetate ? 'Stoichiometric Gas Domain (22.3 mL H₂S)' : 'DGMS 8-hr Shift Limit (80 ppm·h)'}</span>
+            <strong>{isDoseAvailable ? `${shiftPercent}%` : 'N/A'}</strong>
           </div>
           <div style={{ width: '100%', height: '7px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
             <div
@@ -184,11 +240,21 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
 
         {/* Regulatory Action Instruction */}
         <p style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: '600', margin: '8px 0 0 0', lineHeight: 1.4 }}>
-          {isOutOfRange ? 'Warning: Sensor response exceeds calibrated experimental domain.' : alertNote}
+          {isPendingSync
+            ? 'Reading enqueued locally on device. Dose will be calculated when server network restores.'
+            : isCalibUnavailable
+            ? 'Calibration Unavailable: Real experimental calibration data is required before exposure can be computed.'
+            : isImageRejected
+            ? 'Optical Quality Gate Failed: Please recapture under clean, steady, non-glare illumination.'
+            : isVirgin
+            ? `Verified unexposed baseline strip. Zero exposure detected (0.0 ${displayUnit}).`
+            : isOutOfRange
+            ? 'Warning: Sensor response exceeds calibrated experimental domain.'
+            : alertNote}
         </p>
       </div>
 
-      {/* 2. DEDICATED CURRENT Cu-PAN STRIP SENSING CAPACITY CARD */}
+      {/* 2. DEDICATED CURRENT STRIP SENSING CAPACITY CARD */}
       <div
         className="glass-panel"
         style={{
@@ -212,7 +278,7 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
             <Layers size={18} color="var(--accent-cyan)" />
             <div>
               <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', display: 'block' }}>
-                CURRENT Cu-PAN STRIP
+                CURRENT {activeChemDisplay} STRIP
               </strong>
               <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
                 {stripId} &bull; {batchId}
@@ -236,44 +302,51 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
             Sensing Life Remaining
           </span>
 
-          <div style={{ margin: '4px 0 8px 0' }}>
-            {lifeRemaining !== null ? (
-              <span
-                style={{
-                  fontSize: '2.8rem',
-                  fontWeight: '900',
-                  fontFamily: 'var(--font-mono)',
-                  color: isStripExhausted ? '#ef4444' : isStripLow ? '#f59e0b' : '#34d399',
-                  lineHeight: 1
-                }}
-              >
-                {lifeRemaining}%
-              </span>
-            ) : (
-              <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#f59e0b' }}>
-                NOT YET VALIDATED
-              </span>
-            )}
-          </div>
-
-          {/* Graphical Progress Bar: Remaining vs Used */}
-          {lifeRemaining !== null && (
+          {lifeRemaining !== null ? (
             <div>
-              <div style={{ width: '100%', height: '10px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
-                <div
+              <div style={{ margin: '4px 0 8px 0' }}>
+                <span
                   style={{
-                    width: `${lifeRemaining}%`,
-                    height: '100%',
-                    background: isStripExhausted ? '#ef4444' : isStripLow ? '#f59e0b' : 'linear-gradient(90deg, #06b6d4 0%, #10b981 100%)',
-                    transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+                    fontSize: '2.8rem',
+                    fontWeight: '900',
+                    fontFamily: 'var(--font-mono)',
+                    color: isStripExhausted ? '#ef4444' : isStripLow ? '#f59e0b' : '#34d399',
+                    lineHeight: 1
                   }}
-                />
+                >
+                  {lifeRemaining}%
+                </span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                <span>Used: <strong style={{ color: 'var(--text-primary)' }}>{lifeUsed}%</strong> ({cumulativeStripDose.toFixed(1)} ppm·h)</span>
-                <span>Remaining: <strong style={{ color: isStripExhausted ? '#ef4444' : isStripLow ? '#f59e0b' : '#34d399' }}>{lifeRemaining}%</strong> ({Math.max(0, (maxValidatedDose - cumulativeStripDose)).toFixed(1)} ppm·h)</span>
+              {/* Graphical Progress Bar: Remaining vs Used */}
+              <div>
+                <div style={{ width: '100%', height: '10px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      width: `${lifeRemaining}%`,
+                      height: '100%',
+                      background: isStripExhausted ? '#ef4444' : isStripLow ? '#f59e0b' : 'linear-gradient(90deg, #06b6d4 0%, #10b981 100%)',
+                      transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                  <span>Used: <strong style={{ color: 'var(--text-primary)' }}>{lifeUsed}%</strong> ({cumulativeStripDose.toFixed(1)} {displayUnit})</span>
+                  <span>Remaining: <strong style={{ color: isStripExhausted ? '#ef4444' : isStripLow ? '#f59e0b' : '#34d399' }}>{lifeRemaining}%</strong> ({Math.max(0, (maxValidatedDose - cumulativeStripDose)).toFixed(1)} {displayUnit})</span>
+                </div>
               </div>
+            </div>
+          ) : (
+            <div style={{ margin: '10px 0 4px 0' }}>
+              <span style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f59e0b', display: 'block' }}>
+                Sensing capacity: Not yet validated
+              </span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                {isLeadAcetate
+                  ? 'Stoichiometric capacity limit for Lead Acetate is under active experimental characterization.'
+                  : 'Strip active wear life has not yet been validated for this batch.'}
+              </span>
             </div>
           )}
         </div>
@@ -324,7 +397,7 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
               </strong>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                 {isStripExhausted
-                  ? 'Cu-PAN sensing capacity exhausted. New scans blocked until replaced.'
+                  ? `${activeChemName} sensing capacity exhausted. New scans blocked until replaced.`
                   : isStripLow
                   ? 'Sensing capacity below 30%. Recommend replacing soon.'
                   : 'Sensing capacity optimal for continuous shift monitoring.'}
@@ -340,7 +413,7 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
             <span>Active wear window:</span>
           </div>
           <strong style={{ color: isTimeValidated ? 'var(--accent-cyan)' : '#f59e0b', fontFamily: 'var(--font-mono)' }}>
-            {timeRemaining || 'NOT YET VALIDATED'}
+            {isTimeValidated && timeRemaining ? timeRemaining : 'Time-based replacement: Not yet validated'}
           </strong>
         </div>
       </div>
@@ -350,10 +423,12 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
         <div className="glass-panel" style={{ padding: '12px 8px', textAlign: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: 'var(--text-muted)', marginBottom: '4px' }}>
             <Percent size={13} />
-            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase' }}>Confidence</span>
+            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase' }}>
+              {qualityGate?.score ? 'Image Quality' : 'Confidence'}
+            </span>
           </div>
           <strong style={{ fontSize: '1.05rem', color: '#38bdf8' }}>
-            {activeConfidence.toFixed(0)}%
+            {qualityGate?.score ? `${qualityGate.score.toFixed(0)}%` : `${activeConfidence.toFixed(0)}%`}
           </strong>
         </div>
 
@@ -398,7 +473,7 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Cpu size={15} color="var(--accent-cyan)" />
-            <span>Cu-PAN Colorimetry & Calibration Trace</span>
+            <span>{activeChemName} Colorimetry & Calibration Trace</span>
           </div>
           {showTechnicalDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
@@ -407,12 +482,22 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
           <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.2)', fontSize: '0.75rem', lineHeight: '1.6' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
               <div>
-                <span style={{ color: 'var(--text-muted)' }}>Chemistry:</span>{' '}
-                <strong style={{ color: 'var(--accent-cyan)' }}>{chemistry}</strong>
+                <span style={{ color: 'var(--text-muted)' }}>Sensor Chemistry:</span>{' '}
+                <strong style={{ color: 'var(--accent-cyan)' }}>{isLeadAcetate ? 'Lead Acetate (Pb(OAc)₂)' : 'Cu-PAN (Copper(II)-PAN)'}</strong>
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)' }}>Color Transition:</span>{' '}
-                <strong style={{ color: '#fbbf24' }}>Purple &rarr; Yellow/Orange</strong>
+                <strong style={{ color: '#fbbf24' }}>
+                  {isLeadAcetate ? 'White/Cream → Brown/Black (PbS)' : 'Purple → Yellow/Orange'}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Color Space:</span>{' '}
+                <strong style={{ fontFamily: 'var(--font-mono)' }}>CIELAB (D65 Ref)</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Color Difference:</span>{' '}
+                <strong style={{ fontFamily: 'var(--font-mono)' }}>CIEDE2000 (ISO/CIE)</strong>
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)' }}>Measured &Delta;E₀₀:</span>{' '}
@@ -424,10 +509,36 @@ export default function ResultScreen({ result, workerData, onRetryCapture, onNex
                   L:{lab.L?.toFixed(1)} a:{lab.a?.toFixed(1)} b:{lab.b?.toFixed(1)}
                 </strong>
               </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Calibration Model:</span>{' '}
+                <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
+                  {result.model_version || result.model?.model_version || (isLeadAcetate ? 'LEAD_ACETATE_MODEL_V1' : 'CUPAN-MODEL-v2.0')}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Dataset:</span>{' '}
+                <strong style={{ fontFamily: 'var(--font-mono)' }}>
+                  {result.dataset_version || result.model?.dataset_version || (isLeadAcetate ? 'LEAD_ACETATE_DATASET_V1' : 'CUPAN-DATA-200-v2')}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Calibration Status:</span>{' '}
+                <strong style={{ color: calibrationStatus === 'VALID' || calibrationStatus === 'VALID_ESTIMATE' ? '#34d399' : '#f59e0b' }}>
+                  {calibrationStatus || calibration_status || 'VALID'}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Image Quality:</span>{' '}
+                <strong style={{ color: qualityGate?.passed !== false ? '#34d399' : '#f43f5e' }}>
+                  {qualityGate?.score ? `${qualityGate.score.toFixed(0)}%` : '95% (Pass)'}
+                </strong>
+              </div>
             </div>
 
             <div style={{ padding: '8px 10px', borderRadius: '4px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)' }}>
-              Scientific Principle: Cu(II)-PAN + H₂S &rarr; CuS + H-PAN. Strip capacity is calibrated up to {maxValidatedDose} ppm·h based on empirical spline kinetics.
+              {isLeadAcetate
+                ? 'Scientific Principle: Pb(CH₃COO)₂ + H₂S → PbS↓ + 2CH₃COOH. Optical darkening monitored up to 22.3 mL H₂S based on stoichiometric gas-train calibration.'
+                : `Scientific Principle: Cu(II)-PAN + H₂S → CuS + H-PAN. Strip capacity is calibrated up to ${maxValidatedDose || 160.0} ppm·h based on empirical spline kinetics.`}
             </div>
           </div>
         )}

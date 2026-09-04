@@ -2,6 +2,7 @@ const Strip = require('../models/Strip');
 const StripBatch = require('../models/StripBatch');
 const Worker = require('../models/Worker');
 const Reading = require('../models/Reading');
+const { normalizeChemistryId, getChemistryConfig, CHEMISTRY_IDS } = require('../../../shared/chemistryRegistry.cjs');
 
 // Helper to format remaining duration nicely
 function formatRemaining(seconds) {
@@ -74,6 +75,8 @@ exports.getActiveStripForWorker = async (req, res) => {
       strip: {
         stripId: strip.stripId,
         batchId: strip.batchId,
+        chemistry: strip.chemistry,
+        sensor_chemistry: strip.chemistry,
         status: lifecycle.status,
         stripStatus: lifecycle.stripStatus,
         statusLabel: lifecycle.statusLabel,
@@ -95,6 +98,8 @@ exports.getActiveStripForWorker = async (req, res) => {
         activeLifeValidated: !!strip.activeExpiryAt,
         batch: batch ? {
           batchId: batch.batchId,
+          chemistry: batch.chemistry,
+          sensor_chemistry: batch.chemistry,
           manufacturedAt: batch.manufacturedAt,
           validatedShelfLifeDays: batch.validatedShelfLifeDays,
           maxValidatedDosePpmH: batch.maxValidatedDosePpmH,
@@ -115,7 +120,7 @@ exports.getActiveStripForWorker = async (req, res) => {
  */
 exports.activateStrip = async (req, res) => {
   try {
-    const { workerId, stripId, batchId = 'CUPAN-BATCH-001', qrCodePayload } = req.body;
+    const { workerId, stripId, batchId = 'CUPAN-BATCH-001', chemistry, qrCodePayload } = req.body;
 
     if (!workerId || !stripId) {
       return res.status(400).json({
@@ -144,12 +149,15 @@ exports.activateStrip = async (req, res) => {
     }
 
     // 2. Verify or create batch
+    const targetChem = normalizeChemistryId(chemistry) || (batchId.toUpperCase().includes('LEAD') ? CHEMISTRY_IDS.LEAD_ACETATE : CHEMISTRY_IDS.CU_PAN);
+    const chemConfig = getChemistryConfig(targetChem);
+
     let batch = await StripBatch.findOne({ batchId });
     if (!batch) {
       batch = new StripBatch({
         batchId,
-        chemistry: 'Cu-PAN',
-        maxValidatedDosePpmH: 160.0,
+        chemistry: targetChem,
+        maxValidatedDosePpmH: chemConfig.sensingCapacity?.maxValidatedCumulativeDosePpmH ?? null,
         status: 'NOT_YET_VALIDATED'
       });
       await batch.save();
@@ -181,13 +189,18 @@ exports.activateStrip = async (req, res) => {
     }
 
     // 4. Find or create the strip instance
+    const stripChemistry = normalizeChemistryId(chemistry) || batch.chemistry || targetChem;
     let strip = await Strip.findOne({ stripId });
     if (!strip) {
       strip = new Strip({
         stripId,
         batchId,
+        chemistry: stripChemistry,
         qrCodePayload: qrCodePayload || stripId
       });
+    } else {
+      strip.batchId = batchId;
+      strip.chemistry = stripChemistry;
     }
 
     const now = new Date();
@@ -199,7 +212,7 @@ exports.activateStrip = async (req, res) => {
     strip.scanCount = 0;
     strip.currentDose = 0.0;
     strip.cumulativeDosePpmH = 0.0;
-    strip.maxValidatedDosePpmH = batch.maxValidatedDosePpmH || 160.0;
+    strip.maxValidatedDosePpmH = batch.maxValidatedDosePpmH !== undefined ? batch.maxValidatedDosePpmH : (chemConfig.sensingCapacity?.maxValidatedCumulativeDosePpmH ?? null);
     strip.lifeUsedPercent = 0;
     strip.lifeRemainingPercent = 100;
 
@@ -281,7 +294,7 @@ exports.createBatch = async (req, res) => {
   try {
     const {
       batchId,
-      chemistry = 'Cu-PAN',
+      chemistry = 'CU_PAN',
       manufacturedAt,
       validatedShelfLifeDays,
       validatedActiveLifeHours,
@@ -304,6 +317,9 @@ exports.createBatch = async (req, res) => {
       return res.status(409).json({ error: `Batch ${batchId} already exists.` });
     }
 
+    const canonicalChem = normalizeChemistryId(chemistry) || (batchId.toUpperCase().includes('LEAD') ? CHEMISTRY_IDS.LEAD_ACETATE : CHEMISTRY_IDS.CU_PAN);
+    const chemConfig = getChemistryConfig(canonicalChem);
+
     let expiryAt = null;
     const mfg = manufacturedAt ? new Date(manufacturedAt) : new Date();
     if (validatedShelfLifeDays && Number(validatedShelfLifeDays) > 0) {
@@ -312,12 +328,12 @@ exports.createBatch = async (req, res) => {
 
     const batch = new StripBatch({
       batchId,
-      chemistry,
+      chemistry: canonicalChem,
       manufacturedAt: mfg,
       validatedShelfLifeDays: validatedShelfLifeDays ? Number(validatedShelfLifeDays) : null,
       expiryAt,
       validatedActiveLifeHours: validatedActiveLifeHours ? Number(validatedActiveLifeHours) : null,
-      maxValidatedDosePpmH: maxValidatedDosePpmH !== undefined ? Number(maxValidatedDosePpmH) : 160.0,
+      maxValidatedDosePpmH: maxValidatedDosePpmH !== undefined ? Number(maxValidatedDosePpmH) : (chemConfig.sensingCapacity?.maxValidatedCumulativeDosePpmH ?? null),
       storageMinTemp: storageMinTemp !== undefined ? Number(storageMinTemp) : 15.0,
       storageMaxTemp: storageMaxTemp !== undefined ? Number(storageMaxTemp) : 25.0,
       storageMaxHumidity: storageMaxHumidity !== undefined ? Number(storageMaxHumidity) : 60.0,

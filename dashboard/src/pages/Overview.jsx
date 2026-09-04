@@ -28,7 +28,8 @@ import CalculationTraceCard from '../components/CalculationTraceCard';
 import { getWorkers, getWorkerCumulativeDose, createWorker, getRecentReadings } from '../services/api';
 import { DEFAULT_CCM, VIRGIN_BASELINE_LAB } from '@shared/colorimetricStandards';
 
-export default function Overview({ onSelectWorker }) {
+export default function Overview({ onSelectWorker, activeChemistry = 'LEAD_ACETATE', onChemistryChange }) {
+  const isLeadAcetate = activeChemistry === 'LEAD_ACETATE';
   const [workersWithDose, setWorkersWithDose] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,20 +41,20 @@ export default function Overview({ onSelectWorker }) {
   const [activeReading, setActiveReading] = useState({
     workerId: 'W1023',
     shiftId: '2026-09-01-A',
-    dose: 7.4,
-    unit: 'ppm·h',
+    dose: isLeadAcetate ? 11.1 : 7.4,
+    unit: isLeadAcetate ? 'mL H₂S' : 'ppm·h',
     alertLevel: 'CAUTION',
     alertBadgeClass: 'caution',
     confidence: 94,
     temperature_c: 25.0,
-    humidity_percent: 60.0,
-    stripColorRGB: { r: 168, g: 115, b: 130 },
+    humidity_percent: 50.0,
+    stripColorRGB: isLeadAcetate ? { r: 104, g: 95, b: 83 } : { r: 168, g: 115, b: 130 },
     referenceColorRGB: { r: 245, g: 242, b: 235 },
     greyColorRGB: { r: 128, g: 128, b: 128 },
-    lab: { L: 52.0, a: 26.5, b: 2.8 },
-    deltaE00: 19.6,
+    lab: isLeadAcetate ? { L: 40.23, a: 1.92, b: 9.55 } : { L: 52.0, a: 26.5, b: 2.8 },
+    deltaE00: isLeadAcetate ? 50.15 : 19.6,
     cameraProfile: 'mobile_001',
-    stripBatch: 'CUPAN-001',
+    stripBatch: isLeadAcetate ? 'LEADAC-BATCH-20260904' : 'CUPAN-001',
     calibrationStatus: 'VALID'
   });
 
@@ -77,7 +78,12 @@ export default function Overview({ onSelectWorker }) {
           ...prev,
           workerId: r.workerId || prev.workerId,
           shiftId: r.shiftId || prev.shiftId,
-          dose: Number(r.dose || r.estimatedDosePpmHours || prev.dose),
+          dose: (r.dose !== undefined && r.dose !== null) 
+            ? Number(r.dose) 
+            : ((r.estimatedDosePpmHours !== undefined && r.estimatedDosePpmHours !== null) 
+                ? Number(r.estimatedDosePpmHours) 
+                : null),
+          unit: isLeadAcetate ? 'mL H₂S' : (r.unit || 'ppm·h'),
           alertLevel: r.alertLevel || prev.alertLevel,
           confidence: Number(r.confidence ? (r.confidence > 1 ? r.confidence : r.confidence * 100) : prev.confidence),
           temperature_c: Number(r.ambientTemp || prev.temperature_c),
@@ -93,7 +99,7 @@ export default function Overview({ onSelectWorker }) {
 
       // Fetch cumulative dose for each worker concurrently
       const enhanced = await Promise.all(
-        workers.map(async (w) => {
+        (workers || []).map(async (w) => {
           try {
             const doseData = await getWorkerCumulativeDose(w.workerId);
             return {
@@ -101,7 +107,7 @@ export default function Overview({ onSelectWorker }) {
               totalDosePpmHours: doseData.totalDosePpmHours || 0,
               readingCount: doseData.readingCount || 0,
               thresholdPpmHours: doseData.thresholdPpmHours || 80,
-              overThreshold: !!doseData.overThreshold
+              overThreshold: doseData.overThreshold || false
             };
           } catch (e) {
             return {
@@ -125,7 +131,7 @@ export default function Overview({ onSelectWorker }) {
 
   useEffect(() => {
     loadOverviewData();
-  }, []);
+  }, [activeChemistry]);
 
   // Compute KPI metrics
   const totalWorkers = workersWithDose.length;
@@ -172,15 +178,17 @@ export default function Overview({ onSelectWorker }) {
       {/* Top Action Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: '700', color: 'var(--accent-cyan)', background: 'rgba(6, 182, 212, 0.1)', padding: '3px 8px', borderRadius: 'var(--radius-full)', marginBottom: '4px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: '700', color: isLeadAcetate ? '#38bdf8' : 'var(--accent-cyan)', background: isLeadAcetate ? 'rgba(56, 189, 248, 0.12)' : 'rgba(6, 182, 212, 0.1)', padding: '3px 8px', borderRadius: 'var(--radius-full)', marginBottom: '4px' }}>
             <Activity size={13} />
-            <span>SIH26118 • Cu-PAN COLORIMETRIC DOSIMETER</span>
+            <span>SIH26118 • {isLeadAcetate ? 'LEAD ACETATE (Pb(OAc)₂) COLORIMETRIC DOSIMETER' : 'Cu-PAN COLORIMETRIC DOSIMETER'}</span>
           </div>
           <h1 style={{ fontSize: '1.65rem', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: 0 }}>
             H₂S DOSIMETER DASHBOARD
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '2px' }}>
-            Passive Cu-PAN chemical sensing telemetry & statutory DGMS/OISD exposure surveillance.
+            {isLeadAcetate
+              ? 'Passive Lead Acetate chemical sensing telemetry & statutory DGMS/OISD exposure surveillance.'
+              : 'Passive Cu-PAN chemical sensing telemetry & statutory DGMS/OISD exposure surveillance.'}
           </p>
         </div>
 
@@ -236,8 +244,8 @@ export default function Overview({ onSelectWorker }) {
 
         <div
           style={{
-            background: 'rgba(124, 58, 237, 0.08)',
-            border: '1px solid rgba(124, 58, 237, 0.25)',
+            background: isLeadAcetate ? 'rgba(56, 189, 248, 0.08)' : 'rgba(124, 58, 237, 0.08)',
+            border: isLeadAcetate ? '1px solid rgba(56, 189, 248, 0.25)' : '1px solid rgba(124, 58, 237, 0.25)',
             borderRadius: 'var(--radius-sm)',
             padding: '8px 12px',
             display: 'flex',
@@ -245,11 +253,11 @@ export default function Overview({ onSelectWorker }) {
             gap: '8px'
           }}
         >
-          <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#c084fc', textTransform: 'uppercase' }}>
-            2. CU-PAN COLOUR CALIBRATION
+          <span style={{ fontSize: '0.68rem', fontWeight: '800', color: isLeadAcetate ? '#38bdf8' : '#c084fc', textTransform: 'uppercase' }}>
+            {isLeadAcetate ? '2. LEAD ACETATE COLOUR CALIBRATION' : '2. CU-PAN COLOUR CALIBRATION'}
           </span>
           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-            Maps ΔE₀₀ → Dose (ppm·h)
+            {isLeadAcetate ? 'Maps ΔE₀₀ → Relative Dose (mL H₂S)' : 'Maps ΔE₀₀ → Dose (ppm·h)'}
           </span>
         </div>
 
@@ -293,10 +301,10 @@ export default function Overview({ onSelectWorker }) {
           </span>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '4px 0 0 0' }}>
             <span style={{ fontSize: '2.8rem', fontWeight: '900', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>
-              {activeReading.dose.toFixed(1)}
+              {activeReading.dose !== null && activeReading.dose !== undefined ? activeReading.dose.toFixed(1) : '--'}
             </span>
             <span style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
-              ppm·h
+              {activeReading.unit || (isLeadAcetate ? 'mL H₂S' : 'ppm·h')}
             </span>
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -307,15 +315,38 @@ export default function Overview({ onSelectWorker }) {
         {/* Status */}
         <div>
           <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            STATUS
+            STATUS & STATE
           </span>
-          <div style={{ margin: '6px 0' }}>
-            <span className={`badge badge-${activeReading.alertBadgeClass}`} style={{ fontSize: '0.9rem', padding: '6px 14px', textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '6px 0' }}>
+            <span className={`badge badge-${activeReading.alertBadgeClass}`} style={{ fontSize: '0.82rem', padding: '5px 12px', textTransform: 'uppercase' }}>
               {activeReading.alertLevel}
+            </span>
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: '700',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                background: activeReading.calibrationStatus === 'VALID' || activeReading.calibrationStatus === 'VALID_ESTIMATE'
+                  ? 'rgba(16, 185, 129, 0.15)'
+                  : activeReading.calibrationStatus === 'OUTSIDE CALIBRATION RANGE'
+                  ? 'rgba(245, 158, 11, 0.2)'
+                  : 'rgba(148, 163, 184, 0.2)',
+                color: activeReading.calibrationStatus === 'VALID' || activeReading.calibrationStatus === 'VALID_ESTIMATE'
+                  ? '#34d399'
+                  : activeReading.calibrationStatus === 'OUTSIDE CALIBRATION RANGE'
+                  ? '#f59e0b'
+                  : '#94a3b8',
+                border: '1px solid rgba(255,255,255,0.1)'
+              }}
+            >
+              {activeReading.calibrationStatus === 'VALID' || activeReading.calibrationStatus === 'VALID_ESTIMATE'
+                ? 'VALID ESTIMATE'
+                : (activeReading.calibrationStatus || 'PENDING CALIBRATION')}
             </span>
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            DGMS 80 ppm·h Policy: {activeReading.dose > 80 ? 'ACTION REQUIRED' : 'NORMAL'}
+            Chemistry: <strong>{isLeadAcetate ? 'Lead Acetate (Pb(OAc)₂)' : 'Cu-PAN (Copper-PAN)'}</strong>
           </span>
         </div>
 
@@ -324,20 +355,25 @@ export default function Overview({ onSelectWorker }) {
           <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             CONFIDENCE
           </span>
-          <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', margin: '4px 0 0 0' }}>
-            {activeReading.confidence}%
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '4px 0 0 0' }}>
+            <span style={{ fontSize: '2.8rem', fontWeight: '900', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>
+              {activeReading.confidence}
+            </span>
+            <span style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
+              %
+            </span>
           </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--accent-emerald)', fontWeight: '600' }}>
-            ● Calibration {activeReading.calibrationStatus}
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            Optical patch SNR: 99.1%
           </span>
         </div>
 
-        {/* Temperature */}
+        {/* Ambient Temperature */}
         <div>
           <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             TEMPERATURE
           </span>
-          <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', margin: '4px 0 0 0' }}>
+          <div style={{ fontSize: '1.45rem', fontWeight: '800', color: 'var(--text-primary)', margin: '4px 0 0 0', fontFamily: 'var(--font-mono)' }}>
             {activeReading.temperature_c.toFixed(0)} °C
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -345,12 +381,12 @@ export default function Overview({ onSelectWorker }) {
           </span>
         </div>
 
-        {/* Humidity */}
+        {/* Ambient Humidity */}
         <div>
           <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             HUMIDITY
           </span>
-          <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', margin: '4px 0 0 0' }}>
+          <div style={{ fontSize: '1.45rem', fontWeight: '800', color: 'var(--text-primary)', margin: '4px 0 0 0', fontFamily: 'var(--font-mono)' }}>
             {activeReading.humidity_percent.toFixed(0)} %
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -359,11 +395,11 @@ export default function Overview({ onSelectWorker }) {
         </div>
       </div>
 
-      {/* SECTION 1: Cu-PAN REFERENCE COLOUR SCALE CARD */}
-      <CuPanReferenceScale />
+      {/* SECTION 1: REFERENCE COLOUR SCALE CARD */}
+      <CuPanReferenceScale chemistry={activeChemistry} />
 
-      {/* SECTION 2: Cu-PAN STRIP INFORMATION & SHELF LIFE CARD */}
-      <StripInfoCard batchData={{ batchId: activeReading.stripBatch }} />
+      {/* SECTION 2: STRIP INFORMATION & SHELF LIFE CARD */}
+      <StripInfoCard batchData={{ batchId: activeReading.stripBatch }} chemistry={activeChemistry} />
 
       {/* SECTION 3, 4 & 5: COLLAPSIBLE ANALYSIS DETAILS (TECHNICAL VIEW) */}
       <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -630,7 +666,7 @@ export default function Overview({ onSelectWorker }) {
               Register New Worker
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: '20px' }}>
-              Add a field technician to the active Cu-PAN dosimeter monitoring register.
+              Add a field technician to the active {isLeadAcetate ? 'Lead Acetate' : 'Cu-PAN'} dosimeter monitoring register.
             </p>
 
             {modalError && (

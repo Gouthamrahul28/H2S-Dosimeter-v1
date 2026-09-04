@@ -99,8 +99,97 @@ const CALIBRATED_STAGES = [
   }
 ];
 
-export default function CuPanReferenceScale() {
+const LEAD_ACETATE_STAGES = [
+  {
+    stage: 'UNEXPOSED',
+    stageLabel: 'Virgin Baseline',
+    sampleId: 'LEADAC-EXP-001',
+    dose: 0.0,
+    doseFormatted: '0.0 mL H₂S',
+    isCalibrated: true,
+    L: 92.60,
+    a: -0.89,
+    b: 3.51,
+    deltaE00: 0.00,
+    hex: '#EBEAE3',
+    desc: 'Unexposed lead acetate paper matrix (Off-White filter paper).'
+  },
+  {
+    stage: 'LOW RESPONSE',
+    stageLabel: 'Initial Reaction (5.6 mL)',
+    sampleId: 'LEADAC-EXP-004',
+    dose: 5.6,
+    doseFormatted: '5.6 mL H₂S',
+    isCalibrated: true,
+    L: 68.97,
+    a: -0.04,
+    b: 8.53,
+    deltaE00: 23.94,
+    hex: '#B1A99C',
+    desc: 'Initial PbS formation; distinct light tan/buff appearance.'
+  },
+  {
+    stage: 'MODERATE RESPONSE',
+    stageLabel: 'Intermediate Shift (11.1 mL)',
+    sampleId: 'LEADAC-EXP-007',
+    dose: 11.1,
+    doseFormatted: '11.1 mL H₂S',
+    isCalibrated: true,
+    L: 40.23,
+    a: 1.92,
+    b: 9.55,
+    deltaE00: 50.15,
+    hex: '#685F53',
+    desc: 'Dense colloidal PbS precipitation; medium brown indicator color.'
+  },
+  {
+    stage: 'HIGH RESPONSE',
+    stageLabel: 'Heavy Reaction (16.7 mL)',
+    sampleId: 'LEADAC-EXP-010',
+    dose: 16.7,
+    doseFormatted: '16.7 mL H₂S',
+    isCalibrated: true,
+    L: 28.16,
+    a: 2.45,
+    b: 8.33,
+    deltaE00: 60.85,
+    hex: '#494239',
+    desc: 'Extensive PbS crystallization; deep dark grey-brown matrix.'
+  },
+  {
+    stage: 'SATURATED',
+    stageLabel: 'Saturation Limit (22.3 mL)',
+    sampleId: 'LEADAC-EXP-013',
+    dose: 22.3,
+    doseFormatted: '22.3 mL H₂S',
+    isCalibrated: true,
+    L: 20.65,
+    a: 2.67,
+    b: 8.09,
+    deltaE00: 66.75,
+    hex: '#38322B',
+    desc: 'Surface saturation with metallic PbS sheen; optical darkening reaches limit.'
+  },
+  {
+    stage: 'UNCALIBRATED',
+    stageLabel: 'Beyond Calibrated Limit',
+    sampleId: 'OUT-OF-BOUNDS',
+    dose: null,
+    doseFormatted: 'NOT CALIBRATED',
+    isCalibrated: false,
+    L: null,
+    a: null,
+    b: null,
+    deltaE00: null,
+    hex: '#1e293b',
+    desc: 'Exposures beyond 22.3 mL H₂S are not extrapolated without chamber characterization.'
+  }
+];
+
+export default function CuPanReferenceScale({ chemistry = 'CU_PAN' }) {
   const [activeStage, setActiveStage] = useState(null);
+  const isLeadAcetate = chemistry === 'LEAD_ACETATE';
+  const stages = isLeadAcetate ? LEAD_ACETATE_STAGES : CALIBRATED_STAGES;
 
   return (
     <div
@@ -120,7 +209,9 @@ export default function CuPanReferenceScale() {
               width: '28px',
               height: '28px',
               borderRadius: '6px',
-              background: 'linear-gradient(135deg, #7c3aed 0%, #f59e0b 100%)',
+              background: isLeadAcetate
+                ? 'linear-gradient(135deg, #475569 0%, #0f172a 100%)'
+                : 'linear-gradient(135deg, #7c3aed 0%, #f59e0b 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -131,17 +222,19 @@ export default function CuPanReferenceScale() {
           </div>
           <div>
             <h3 style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
-              Cu-PAN Reference Colour Scale
+              {isLeadAcetate ? 'Lead Acetate (Pb(OAc)₂) Reference Colour Scale' : 'Cu-PAN Reference Colour Scale'}
             </h3>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-              Experimentally calibrated chromatic progression (Hover/tap swatch for ΔE₀₀ & CIELAB coordinates)
+              {isLeadAcetate
+                ? 'Experimentally validated PbS darkening progression (Hover/tap swatch for ΔE₀₀ & coordinates)'
+                : 'Experimentally calibrated chromatic progression (Hover/tap swatch for ΔE₀₀ & CIELAB coordinates)'}
             </span>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
           <Info size={13} />
-          <span>Derived from chamber dataset</span>
+          <span>{isLeadAcetate ? 'Derived from Two-Tube Gas Train Trial' : 'Derived from chamber dataset'}</span>
         </div>
       </div>
 
@@ -156,8 +249,8 @@ export default function CuPanReferenceScale() {
           WebkitOverflowScrolling: 'touch'
         }}
       >
-        {CALIBRATED_STAGES.map((pt, idx) => {
-          const hex = pt.isCalibrated ? labToHex(pt.L, pt.a, pt.b) : 'transparent';
+        {stages.map((pt, idx) => {
+          const hex = pt.hex || (pt.isCalibrated ? labToHex(pt.L, pt.a, pt.b) : 'transparent');
           const isSelected = activeStage?.stage === pt.stage;
 
           return (

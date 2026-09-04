@@ -99,9 +99,21 @@ async function seedDatabase() {
       status: 'RECALLED'
     });
 
-    console.log(`[Seed] Created 3 Cu-PAN batches: ${batch1.batchId}, ${batch2.batchId}, ${batch3.batchId}`);
+    const batchLA1 = await StripBatch.create({
+      batchId: 'LA-BATCH-2026-01',
+      chemistry: 'LEAD_ACETATE',
+      manufacturedAt: new Date(now.getTime() - 5 * 86400 * 1000),
+      validatedShelfLifeDays: null,
+      expiryAt: null,
+      validatedActiveLifeHours: null,
+      maxValidatedDosePpmH: null,
+      status: 'NOT_YET_VALIDATED',
+      isDemo: true
+    });
 
-    console.log('[Seed] Creating disposable Cu-PAN strips and worker assignments...');
+    console.log(`[Seed] Created batches: ${batch1.batchId}, ${batch2.batchId}, ${batch3.batchId}, ${batchLA1.batchId}`);
+
+    console.log('[Seed] Creating disposable strips and worker assignments...');
 
     // Strip 1: Active for W1023 (Cumulative 113.7 / 160 -> 71% used, 29% remaining -> REPLACE_SOON)
     const strip1 = await Strip.create({
@@ -183,6 +195,7 @@ async function seedDatabase() {
     const strip5 = await Strip.create({
       stripId: 'CUPAN-2026-000199',
       batchId: 'CUPAN-BATCH-001',
+      chemistry: 'CU_PAN',
       qrCodePayload: 'CUPAN-B001-000199',
       status: 'UNISSUED',
       stripStatus: 'UNISSUED',
@@ -190,6 +203,26 @@ async function seedDatabase() {
       cumulativeDosePpmH: 0.0,
       lifeUsedPercent: 0,
       lifeRemainingPercent: 100
+    });
+
+    // Strip 6: Active Lead Acetate strip for W1026
+    const stripLA1 = await Strip.create({
+      stripId: 'LA-STRIP-2026-000101',
+      batchId: 'LA-BATCH-2026-01',
+      chemistry: 'LEAD_ACETATE',
+      workerId: 'W1026',
+      qrCodePayload: 'LA-B01-000101',
+      assignedAt: new Date(now.getTime() - 4 * 3600 * 1000),
+      activatedAt: new Date(now.getTime() - 4 * 3600 * 1000),
+      activeExpiryAt: null,
+      status: 'ACTIVE',
+      stripStatus: 'GOOD',
+      scanCount: 1,
+      currentDose: 15.0,
+      cumulativeDosePpmH: 15.0,
+      maxValidatedDosePpmH: null,
+      lifeUsedPercent: null,
+      lifeRemainingPercent: null
     });
 
     console.log('[Seed] Creating worker personnel records with registration & status...');
@@ -230,8 +263,8 @@ async function seedDatabase() {
         workerCode: 'EMP-1026',
         department: 'Maintenance & Turnaround',
         worksite: 'Offshore Pigging Facility',
-        status: 'INACTIVE',
-        assignedStripId: null,
+        status: 'ACTIVE',
+        assignedStripId: 'LA-STRIP-2026-000101',
         registrationDate: new Date(now.getTime() - 30 * 86400 * 1000)
       },
       {
@@ -243,6 +276,16 @@ async function seedDatabase() {
         status: 'BLOCKED',
         assignedStripId: 'CUPAN-2026-000123',
         registrationDate: new Date(now.getTime() - 20 * 86400 * 1000)
+      },
+      {
+        workerId: 'W1028',
+        name: 'Kavita Iyer',
+        workerCode: 'EMP-1028',
+        department: 'Environmental Health & Safety',
+        worksite: 'Central HSE Hub',
+        status: 'INACTIVE',
+        assignedStripId: null,
+        registrationDate: new Date(now.getTime() - 15 * 86400 * 1000)
       }
     ]);
     console.log(`[Seed] Created ${workers.length} workers with access control flags.`);
@@ -435,11 +478,36 @@ async function seedDatabase() {
         estimatedDosePpmHours: 36.8,
         calibrationCurveVersion: 'cupan-cielab-v1',
         capturedAt: new Date()
+      },
+      // Vikram Singh (W1026) - Lead Acetate Dosimeter
+      {
+        workerId: 'W1026',
+        shiftId: '2026-08-31-A',
+        scanId: 'la_scan_1026_01',
+        stripId: 'LA-STRIP-2026-000101',
+        stripBatch: 'LA-BATCH-2026-01',
+        cameraProfile: 'mobile_001',
+        imageUrl: img1,
+        chemistry: 'LEAD_ACETATE',
+        stripColorRGB: { r: 165, g: 155, b: 140 },
+        referenceColorRGB: { r: 250, g: 250, b: 250 },
+        greyColorRGB: { r: 128, g: 128, b: 128 },
+        correctedColorRGB: { r: 165, g: 155, b: 140 },
+        lab: { L: 63.50, a: 1.20, b: 8.50 },
+        deltaE00: 12.8,
+        confidence: 0.95,
+        calibrationStatus: 'VALID_ESTIMATE',
+        expiryPatchStatus: 'valid',
+        ambientTemp: 29.0,
+        ambientHumidity: 55,
+        estimatedDosePpmHours: 15.0,
+        calibrationCurveVersion: 'lead-acetate-v1',
+        capturedAt: new Date()
       }
     ];
 
     await Reading.insertMany(sampleReadings);
-    console.log(`[Seed] Seeded ${sampleReadings.length} Cu-PAN exposure readings across strips.`);
+    console.log(`[Seed] Seeded ${sampleReadings.length} exposure readings across strips.`);
 
     console.log('[Seed] Database seeding completed successfully!');
     process.exit(0);

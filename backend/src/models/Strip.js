@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeChemistryId } = require('../../../shared/chemistryRegistry.cjs');
 
 const StripSchema = new mongoose.Schema(
   {
@@ -15,6 +16,13 @@ const StripSchema = new mongoose.Schema(
       ref: 'StripBatch',
       trim: true,
       index: true
+    },
+    chemistry: {
+      type: String,
+      default: 'CU_PAN',
+      required: true,
+      index: true,
+      set: (v) => normalizeChemistryId(v) || v
     },
     workerId: {
       type: String,
@@ -191,7 +199,8 @@ StripSchema.methods.getLifecycleStatus = function () {
     isExpired,
     isExhausted: isExhaustedByDose,
     replacementRequired: isExpired || computedStripStatus === 'REPLACE_NOW',
-    replacementUrgency
+    replacementUrgency,
+    chemistry: this.chemistry || 'CU_PAN'
   };
 };
 

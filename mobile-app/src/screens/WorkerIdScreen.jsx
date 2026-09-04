@@ -136,6 +136,9 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
   const isStripExpired = activeStripData?.isExpired || activeStripData?.status === 'EXPIRED';
   const isStripExpiringSoon = activeStripData?.isExpiringSoon || (countdownSeconds !== null && countdownSeconds > 0 && countdownSeconds <= 86400);
 
+  const activeChem = activeStripData?.chemistry || activeStripData?.sensor_chemistry;
+  const isLeadAcetate = activeChem === 'LEAD_ACETATE' || activeChem === 'Lead-Acetate';
+
   const canScan = isRegistered && isWorkerActive && hasActiveStrip && !isStripExpired;
 
   const handleNext = (e) => {
@@ -143,13 +146,17 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
     if (!canScan) return;
 
     const finalShiftId = isCustomShift ? customShiftId.trim() : getTodayShiftId(shiftLetter);
+    const resolvedChem = activeChem || 'CU_PAN';
     setError('');
     onProceed({
       workerId: workerId.trim().toUpperCase(),
       workerName: matchedWorker?.name || 'Worker',
       department: matchedWorker?.department || 'Operations',
       shiftId: finalShiftId,
-      assignedStripId: activeStripData?.stripId || 'CUPAN-2026-000123'
+      assignedStripId: activeStripData?.stripId || (resolvedChem === 'LEAD_ACETATE' ? 'LA-STRIP-2026-000101' : 'CUPAN-2026-000123'),
+      stripBatch: activeStripData?.batchId || activeStripData?.batch?.batchId,
+      chemistry: resolvedChem,
+      sensor_chemistry: resolvedChem
     });
   };
 
@@ -171,14 +178,14 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
         >
           <ShieldCheck size={15} color="#06b6d4" />
           <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#38bdf8', letterSpacing: '0.04em' }}>
-            SIH26118 • Cu-PAN DOSIMETRY FIELD PWA
+            SIH26118 • {isLeadAcetate ? 'LEAD ACETATE' : 'Cu-PAN'} DOSIMETRY FIELD PWA
           </span>
         </div>
         <h1 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: '4px 0' }}>
           Worker Field Terminal
         </h1>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-          Access-controlled optical scan and disposable Cu-PAN strip replacement lifecycle
+          Access-controlled optical scan and disposable {isLeadAcetate ? 'Lead Acetate' : 'Cu-PAN'} strip replacement lifecycle
         </p>
       </div>
 
@@ -344,7 +351,7 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Layers size={16} color="var(--accent-cyan)" />
               <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                ACTIVE Cu-PAN DISPOSABLE STRIP
+                ACTIVE {isLeadAcetate ? 'LEAD ACETATE' : 'Cu-PAN'} DISPOSABLE STRIP
               </strong>
             </div>
 
@@ -436,7 +443,7 @@ export default function WorkerIdScreen({ onProceed, initialWorkerId = '', initia
             <div style={{ textAlign: 'center', padding: '16px 8px' }}>
               <AlertTriangle size={24} color="#f59e0b" style={{ margin: '0 auto 6px auto' }} />
               <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)', display: 'block' }}>
-                No Active Cu-PAN Strip Assigned
+                No Active {isLeadAcetate ? 'Lead Acetate' : 'Cu-PAN'} Strip Assigned
               </strong>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', margin: '4px 0 10px 0' }}>
                 A valid disposable strip must be assigned to this worker before scanning.

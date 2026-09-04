@@ -11,6 +11,8 @@
  */
 
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 const BASE_HOST = 'localhost';
 const BASE_PORT = 5000;
@@ -48,7 +50,10 @@ function makeRequest(method, path, body = null) {
   });
 }
 
-const TEST_PNG_1X1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjuAAAAAElFTkSuQmCC';
+const sampleImgPath = path.join(__dirname, 'backend/uploads/sample-w1024-shift1.jpg');
+const TEST_PNG_1X1 = fs.existsSync(sampleImgPath)
+  ? `data:image/jpeg;base64,${fs.readFileSync(sampleImgPath).toString('base64')}`
+  : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjuAAAAAElFTkSuQmCC';
 
 async function runSecurityAndLifecycleTests() {
   console.log('================================================================');
@@ -90,7 +95,7 @@ async function runSecurityAndLifecycleTests() {
   // Test 2: Inactive worker blocked from scanning
   await test('Security: Inactive worker blocked from scanning (POST /scan)', async () => {
     const res = await makeRequest('POST', '/scan', {
-      workerId: 'W1026', // Vikram Singh - INACTIVE
+      workerId: 'W1028', // Kavita Iyer - INACTIVE
       imageBase64: TEST_PNG_1X1
     });
 
@@ -280,11 +285,11 @@ async function runSecurityAndLifecycleTests() {
     const testWorkerId = `W_CAP_${Date.now().toString().slice(-4)}`;
     const testStripId = `CUPAN-STRIP-CAP-${Date.now().toString().slice(-4)}`;
 
-    // 1. Create batch with low max capacity (e.g. 5.0 ppm·h)
+    // 1. Create batch with low max capacity (e.g. 2.0 ppm·h)
     await makeRequest('POST', '/admin/batches', {
       batchId: testBatchId,
       chemistry: 'Cu-PAN',
-      maxValidatedDosePpmH: 5.0
+      maxValidatedDosePpmH: 2.0
     });
 
     await makeRequest('POST', '/workers', {

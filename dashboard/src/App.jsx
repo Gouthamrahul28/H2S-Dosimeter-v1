@@ -28,11 +28,18 @@ import OnboardingModal from './components/OnboardingModal';
 export default function App() {
   const [currentPage, setCurrentPage] = useState('overview'); // 'overview' | 'history' | 'calibration' | 'batches' | 'dgms' | 'standards'
   const [selectedWorkerId, setSelectedWorkerId] = useState('W1001');
+  const [activeChemistry, setActiveChemistry] = useState(() => {
+    return localStorage.getItem('h2s_dashboard_chemistry') || 'LEAD_ACETATE';
+  });
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('h2s_dashboard_theme');
     return saved ? saved === 'dark' : true;
   });
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('h2s_dashboard_chemistry', activeChemistry);
+  }, [activeChemistry]);
 
   // Apply theme to document element
   useEffect(() => {
@@ -78,7 +85,7 @@ export default function App() {
         }}
       >
         {/* Brand Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '28px', paddingLeft: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', paddingLeft: '8px' }}>
           <div
             style={{
               width: '40px',
@@ -101,6 +108,49 @@ export default function App() {
             <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)', fontWeight: '700', letterSpacing: '0.06em' }}>
               SAFETY SUITE (MRPL)
             </span>
+          </div>
+        </div>
+
+        {/* Sensor Chemistry Switcher */}
+        <div style={{ marginBottom: '18px', padding: '0 4px' }}>
+          <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' }}>
+            SENSOR CHEMISTRY
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+            <button
+              onClick={() => setActiveChemistry('LEAD_ACETATE')}
+              style={{
+                padding: '6px 4px',
+                borderRadius: '6px',
+                border: activeChemistry === 'LEAD_ACETATE' ? '1px solid #38bdf8' : '1px solid transparent',
+                background: activeChemistry === 'LEAD_ACETATE' ? 'rgba(56, 189, 248, 0.18)' : 'transparent',
+                color: activeChemistry === 'LEAD_ACETATE' ? '#38bdf8' : 'var(--text-secondary)',
+                fontSize: '0.74rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Lead Acetate
+            </button>
+            <button
+              onClick={() => setActiveChemistry('CU_PAN')}
+              style={{
+                padding: '6px 4px',
+                borderRadius: '6px',
+                border: activeChemistry === 'CU_PAN' ? '1px solid #c084fc' : '1px solid transparent',
+                background: activeChemistry === 'CU_PAN' ? 'rgba(192, 132, 252, 0.18)' : 'transparent',
+                color: activeChemistry === 'CU_PAN' ? '#c084fc' : 'var(--text-secondary)',
+                fontSize: '0.74rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Cu-PAN
+            </button>
           </div>
         </div>
 
@@ -191,7 +241,7 @@ export default function App() {
             }}
           >
             <Layers size={18} />
-            <span>Cu-PAN Batches</span>
+            <span>{activeChemistry === 'LEAD_ACETATE' ? 'Lead Acetate Batches' : 'Cu-PAN Batches'}</span>
           </button>
 
           <button
@@ -294,30 +344,46 @@ export default function App() {
       {/* Main Page Area */}
       <main style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', maxHeight: '100vh' }}>
         {currentPage === 'overview' && (
-          <Overview onSelectWorker={handleSelectWorkerFromOverview} />
+          <Overview
+            onSelectWorker={handleSelectWorkerFromOverview}
+            activeChemistry={activeChemistry}
+            onChemistryChange={setActiveChemistry}
+          />
         )}
 
         {currentPage === 'history' && (
           <WorkerHistory
             initialWorkerId={selectedWorkerId}
             onBack={() => setCurrentPage('overview')}
+            activeChemistry={activeChemistry}
           />
         )}
 
         {currentPage === 'calibration' && (
-          <CalibrationModelPage />
+          <CalibrationModelPage
+            activeChemistry={activeChemistry}
+            onChemistryChange={setActiveChemistry}
+          />
         )}
 
         {currentPage === 'batches' && (
-          <BatchesPage />
+          <BatchesPage
+            activeChemistry={activeChemistry}
+            onChemistryChange={setActiveChemistry}
+          />
         )}
 
         {currentPage === 'dgms' && (
-          <DGMSReport />
+          <DGMSReport
+            activeChemistry={activeChemistry}
+          />
         )}
 
         {currentPage === 'standards' && (
-          <StandardsPage />
+          <StandardsPage
+            activeChemistry={activeChemistry}
+            onChemistryChange={setActiveChemistry}
+          />
         )}
       </main>
 

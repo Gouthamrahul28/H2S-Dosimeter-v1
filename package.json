@@ -1,19 +1,32 @@
 {
-  "name": "h2s-dosimeter-system-root",
+  "name": "h2s-safetrack",
   "version": "1.0.0",
-  "description": "Root workspace orchestrator for H2S Dosimeter System",
+  "description": "H2S-SafeTrack: Lead(II) Acetate Optical Dosimeter Industrial Safety Platform",
   "scripts": {
-    "install:all": "npm install --prefix backend && npm install --prefix mobile-app && npm install --prefix dashboard",
-    "seed": "npm run seed --prefix backend",
-    "seed:large": "node seed-large-dataset.js 50 15",
-    "seed:huge": "node seed-large-dataset.js 150 25",
-    "train": "node train-calibration-model.js",
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
     "dev:backend": "npm start --prefix backend",
     "dev:mobile": "npm run dev --prefix mobile-app",
-    "dev:dashboard": "npm run dev --prefix dashboard",
-    "build:all": "npm run build --prefix mobile-app && npm run build --prefix dashboard"
+    "dev:dashboard": "npm run dev --prefix dashboard"
   },
   "dependencies": {
+    "next": "^14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.453.0",
+    "recharts": "^2.12.7",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.4",
     "puppeteer-core": "^25.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@types/node": "^20.16.11",
+    "tailwindcss": "^3.4.14",
+    "postcss": "^8.4.47",
+    "autoprefixer": "^10.4.20"
   }
 }

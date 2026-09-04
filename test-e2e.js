@@ -7,6 +7,8 @@
  */
 
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 const BASE_HOST = 'localhost';
 const BASE_PORT = 5000;
@@ -135,7 +137,10 @@ async function runTests() {
       batchId: 'CUPAN-BATCH-001'
     });
 
-    const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjuAAAAAElFTkSuQmCC';
+    const sampleImgPath = path.join(__dirname, 'backend/uploads/sample-w1024-shift1.jpg');
+    const testImage = fs.existsSync(sampleImgPath)
+      ? `data:image/jpeg;base64,${fs.readFileSync(sampleImgPath).toString('base64')}`
+      : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjuAAAAAElFTkSuQmCC';
     const payload = {
       workerId: testWorkerId,
       shiftId: '2026-09-01-AUTO-TEST',
@@ -148,7 +153,7 @@ async function runTests() {
     const res = await makeRequest('POST', '/scan', payload);
     if (res.status !== 201) throw new Error(`Expected 201 Created, got ${res.status}: ${JSON.stringify(res.data)}`);
     const data = res.data;
-    if (!data.readingId || data.chemistry !== 'Cu-PAN' || typeof data.dose !== 'number' || data.unit !== 'ppm·h') {
+    if (!data.readingId || (data.chemistry !== 'Cu-PAN' && data.chemistry !== 'CU_PAN') || typeof data.dose !== 'number' || data.unit !== 'ppm·h') {
       throw new Error(`Response missing Cu-PAN contract keys: ${JSON.stringify(data)}`);
     }
   });

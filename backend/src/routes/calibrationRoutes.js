@@ -3,12 +3,27 @@ const router = express.Router();
 const calibrationController = require('../controllers/calibrationController');
 const modelController = require('../controllers/modelCalibrationController');
 
+// Centralized Sensor Chemistry Abstraction APIs
+router.get('/chemistries', calibrationController.getRegisteredChemistries);
+router.get('/profile', calibrationController.getCalibrationProfile);
+
 // Camera CCM Calibration
 router.post('/camera', calibrationController.calibrateCamera);
 
 // Cu-PAN Chemical Calibration
 router.post('/cupan', calibrationController.recordCuPANCalibration);
 router.get('/cupan', calibrationController.getCuPANCalibration);
+
+// Lead Acetate Dedicated Calibration APIs (Phase 4)
+router.get('/lead-acetate', calibrationController.getLeadAcetateProfile);
+router.get('/lead-acetate/dataset', calibrationController.getLeadAcetateDataset);
+router.post('/lead-acetate/sample', calibrationController.recordLeadAcetateSample);
+router.post('/lead-acetate/validate', calibrationController.validateLeadAcetateInputs);
+router.post('/lead-acetate/predict', calibrationController.predictLeadAcetateExposure);
+router.post('/lead-acetate/fit-test-fixture', calibrationController.loadTestPlumbingFixture);
+router.post('/lead-acetate/fit-experimental', calibrationController.fitExperimentalLeadAcetate);
+router.post('/lead-acetate/reset', calibrationController.resetLeadAcetateCalibration);
+router.get('/models/:chemistry/:version', calibrationController.getModelByChemistryAndVersion);
 
 // Cu-PAN Model & Metrology Suite
 router.get('/summary', modelController.getCalibrationSummary);

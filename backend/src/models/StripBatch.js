@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeChemistryId } = require('../../../shared/chemistryRegistry.cjs');
 
 const StripBatchSchema = new mongoose.Schema(
   {
@@ -11,8 +12,10 @@ const StripBatchSchema = new mongoose.Schema(
     },
     chemistry: {
       type: String,
-      default: 'Cu-PAN',
-      required: true
+      default: 'CU_PAN',
+      required: true,
+      index: true,
+      set: (v) => normalizeChemistryId(v) || v
     },
     manufacturedAt: {
       type: Date,
