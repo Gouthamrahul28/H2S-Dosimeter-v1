@@ -41,6 +41,8 @@ export interface ColorimetryResult {
   refWhiteLab: ColorLab;
   opticalDensity: number;
   deltaE00: number;
+  /** Cumulative exposure dose in ppm·hours since badge activation, read off the
+   *  badge's irreversible color change — not an instantaneous concentration snapshot. */
   estimatedPpm: number;
   alertLevel: SafetyAlertLevel;
   badgeClass: 'safe' | 'trace' | 'caution' | 'warning' | 'danger' | 'critical';

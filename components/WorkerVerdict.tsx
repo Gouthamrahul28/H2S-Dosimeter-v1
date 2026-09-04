@@ -186,6 +186,11 @@ export const WorkerVerdict: React.FC<WorkerVerdictProps> = ({
           <span className="text-2xl font-bold font-mono text-slate-300">PPM</span>
         </div>
 
+        <p className="text-[10px] font-mono text-slate-400 -mt-1">
+          Cumulative exposure dose (ppm&middot;h) since badge activation &mdash; not an
+          instantaneous ambient concentration reading.
+        </p>
+
         <p className="text-xs font-semibold text-slate-200 mt-1 max-w-xs">
           {result.nearestAnchor.recommendedAction}
         </p>

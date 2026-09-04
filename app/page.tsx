@@ -33,6 +33,17 @@ export default function LandingPage() {
           Acetate cellulose reaction. Instant field exposure evaluation, Bradford chromatic adaptation,
           and continuous EHS fleet compliance.
         </p>
+
+        <div className="inline-flex items-start gap-2 px-4 py-2 rounded-lg text-xs font-mono bg-amber-950/40 border border-amber-600/40 text-amber-200 max-w-xl mx-auto text-left">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            <strong>[PROTOTYPE]</strong> Calibration status: color anchors are bench-informed but
+            pending full accredited lab validation. Shelf-life (target 30&ndash;90 days) is [OPEN] and
+            not yet accelerated-aging tested. This wristband estimates cumulative dose (ppm&middot;hours),
+            not instantaneous concentration, and is complementary to &mdash; not a replacement for &mdash;
+            certified real-time electronic H&#8322;S detectors.
+          </span>
+        </div>
       </div>
 
       {/* Dual Portal Cards: Worker PWA vs Supervisor Command */}

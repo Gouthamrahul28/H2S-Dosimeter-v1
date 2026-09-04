@@ -1,10 +1,27 @@
 /**
  * H2S-SafeTrack: Lead(II) Acetate Calibration Data & Safety Standards
- * 
+ *
  * Chemocassette Reaction:
  * Pb(CH3COO)2 + H2S (g) -> PbS (insoluble brownish-black precipitate) + 2 CH3COOH
- * 
+ *
  * Chemistry: Exclusively Lead(II) Acetate Trihydrate.
+ *
+ * REGULATORY NOTE (SIH26118 audit, 2026-09-04):
+ * Numeric thresholds below (OSHA PEL/Ceiling/Peak, NIOSH IDLH, ACGIH TWA/STEL) are
+ * retained as internationally cross-referenced comparative benchmarks. For deployment
+ * in India, the applicable statutory references are IS-5780:1980 (Indian Standard for
+ * Hydrogen Sulphide gas detection), the Factories Act 1948 Schedule II occupational
+ * exposure limits, and DGMS (Directorate General of Mines Safety) circulars.
+ * [OPEN]: Exact numeric IS-5780:1980 threshold values have not yet been sourced from
+ * the official standard document in this codebase — do not assume they equal the
+ * OSHA/NIOSH figures below. Replace this note once IS-5780:1980 is obtained and cited.
+ *
+ * CALIBRATION PROVENANCE:
+ * [SOURCED] = informed by bench measurements in data/lab_manual_strips/ and
+ *   calibration_plots/lead_acetate_experimental_calibration.{png,svg}.
+ * [ESTIMATE] = interpolated/extrapolated beyond directly bench-tested exposure levels.
+ * See per-anchor tags below. Shelf-life of the badges themselves is [OPEN]: no
+ * accelerated-aging validation data exists in this repo yet (target 30-90 days).
  */
 
 export interface ColorRGB {
@@ -33,6 +50,9 @@ export type SafetyAlertLevel =
 export interface CalibrationAnchor {
   id: number;
   name: string;
+  /** Cumulative exposure dose equivalent in ppm·hours since badge activation
+   *  (irreversible PbS deposition integrates concentration over time) —
+   *  NOT an instantaneous ambient concentration reading. */
   h2sPpm: number;
   ppmRangeMin: number;
   ppmRangeMax: number;
@@ -75,6 +95,7 @@ export const D65_WHITE_POINT = Object.freeze({
  * Expanded dynamic range: 0.0 to 100.0+ ppm (Baseline through NIOSH IDLH)
  */
 export const LEAD_ACETATE_CALIBRATION_ANCHORS: readonly CalibrationAnchor[] = Object.freeze([
+  // [SOURCED] Bench trial series: data/lab_manual_strips/strip_trial_1_0.0mL.png
   {
     id: 1,
     name: 'Baseline / Pristine',
@@ -93,6 +114,7 @@ export const LEAD_ACETATE_CALIBRATION_ANCHORS: readonly CalibrationAnchor[] = Ob
     oshaAcgihGuidance: 'Within normal atmospheric background (< 1.0 ppm).',
     recommendedAction: 'Safe to proceed. Normal shift monitoring routine.',
   },
+  // [SOURCED] Bench trial series: data/lab_manual_strips/strip_trial_2_5.6mL.png
   {
     id: 2,
     name: 'Trace Yellowing',
@@ -111,6 +133,7 @@ export const LEAD_ACETATE_CALIBRATION_ANCHORS: readonly CalibrationAnchor[] = Ob
     oshaAcgihGuidance: 'Below OSHA 10 ppm 8-hr TWA. Actionable trace H2S detected.',
     recommendedAction: 'Inspect localized valves and seals. Continue routine check.',
   },
+  // [SOURCED] Bench trial series: data/lab_manual_strips/strip_trial_3_11.1mL.png
   {
     id: 3,
     name: 'Cautionary Caramel',
@@ -129,6 +152,8 @@ export const LEAD_ACETATE_CALIBRATION_ANCHORS: readonly CalibrationAnchor[] = Ob
     oshaAcgihGuidance: 'Exceeds ACGIH 1.0 ppm TWA. Approaching OSHA 10.0 ppm PEL.',
     recommendedAction: 'Increase ventilation immediately. Alert shift buddy. Stand by with respirator.',
   },
+  // [SOURCED] Bench trial series: data/lab_manual_strips/strip_trial_4_16.7mL.png and
+  // strip_trial_5_22.3mL.png (highest H2S-generator volumes bench-tested to date)
   {
     id: 4,
     name: 'Warning (PEL Breach)',
@@ -147,6 +172,8 @@ export const LEAD_ACETATE_CALIBRATION_ANCHORS: readonly CalibrationAnchor[] = Ob
     oshaAcgihGuidance: 'OSHA 8-hour Permissible Exposure Limit (10.0 ppm PEL) breached.',
     recommendedAction: 'CEASE WORK IMMEDIATELY. Evacuate sector upwind or don positive-pressure SCBA.',
   },
+  // [ESTIMATE] Extrapolated beyond the bench-tested trial series (data/lab_manual_strips/)
+  // pending higher-concentration lab validation. Not yet independently measured.
   {
     id: 5,
     name: 'Danger (Ceiling Breach)',
@@ -165,6 +192,9 @@ export const LEAD_ACETATE_CALIBRATION_ANCHORS: readonly CalibrationAnchor[] = Ob
     oshaAcgihGuidance: 'OSHA 20.0 ppm Acceptable Ceiling breached. Strong odor, eye and respiratory irritation.',
     recommendedAction: 'EMERGENCY EVACUATION. Evacuate all personnel immediately. Respiratory protection mandatory.',
   },
+  // [ESTIMATE] Extrapolated beyond the bench-tested trial series (data/lab_manual_strips/).
+  // 100 ppm IDLH conditions are not safely reproducible in an unventilated bench setup;
+  // this anchor is a modeled saturation endpoint pending certified lab validation.
   {
     id: 6,
     name: 'IDLH Critical Hazard',
