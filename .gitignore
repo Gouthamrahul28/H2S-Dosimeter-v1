@@ -26,6 +26,9 @@ backend/uploads/*.png
 backend/uploads/*.webp
 !backend/uploads/sample-*.jpg
 
+# TypeScript incremental build cache
+*.tsbuildinfo
+
 # Logs & System artifacts
 *.log
 npm-debug.log*
