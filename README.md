@@ -102,6 +102,14 @@ The platform is calibrated against 6 empirical laboratory anchors spanning safe 
 - **OSHA Maximum Peak:** $50.0\text{ ppm}$ (10 min once per shift)
 - **NIOSH IDLH (Immediately Dangerous to Life or Health):** $100.0\text{ ppm}$ (Instant evacuation)
 
+> **Regulatory scope note (SIH26118 is an Indian problem statement):** the figures above are
+> retained as internationally cross-referenced comparative benchmarks. For deployment in India,
+> the applicable statutory references are **IS-5780:1980** (Indian Standard for Hydrogen
+> Sulphide gas detection), the **Factories Act 1948 Schedule II** occupational exposure limits,
+> and **DGMS** (Directorate General of Mines Safety) circulars. `[OPEN]`: the exact numeric
+> IS-5780:1980 thresholds have not yet been sourced/cited in this repository — treat this as an
+> outstanding compliance item, not an assumption that they match the OSHA/NIOSH figures above.
+
 ---
 
 ## 4. Worker Mobile PWA Features
